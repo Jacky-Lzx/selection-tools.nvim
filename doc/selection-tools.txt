@@ -120,7 +120,15 @@ the current item opens. Loaded dirty buffers and exact positions are preserved.
 
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
-The grep source performs live full-text search using ripgrep JSON output.
+Custom finder callbacks may call ctx.append_items(items) to append rows and
+ctx.done({truncated=reason}) to report a limit. ctx.set_items replaces all rows.
+
+The grep source streams ripgrep JSON output in scheduled batches. Visible results
+arrive before the producer exits; appends preserve the selected item and marks.
+limit=10000, max_output=32 MiB and max_line_bytes=1 MiB bound work/output.
+Reaching a bound stops the process, shows "Limit reached", and sets
+picker.truncated to the reason. The result limit is not a total-match count.
+New queries/option changes/close cancel producers and discard late chunks.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
 Grep defaults to result_layout="grep": code is left-aligned and file locations

@@ -112,6 +112,10 @@ require("selection_tools").grep({
 
 也可调用 `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })`，或在 `files()` / `grep()` 的调用选项中指定。
 
+## 流式全文搜索
+
+Grep 边接收 ripgrep JSON 边展示结果，分批解析时保持输入可响应；追加结果保留当前条目和多选标记。达到 `limit`（默认 10000）、`max_output`（默认 32 MiB）或 `max_line_bytes`（默认 1 MiB）后停止进程，右下角显示 `Limit reached`，具体原因可读取 `picker.truncated`。达到结果上限表示“上限已到”，不代表总命中数已知。新查询、切换选项及关闭窗口会取消旧进程并丢弃迟到的数据。
+
 ## 匹配后端
 
 ```lua
@@ -264,6 +268,7 @@ nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
+nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 python3 tests/tui.py
 ```
 

@@ -60,7 +60,7 @@ function Picker:_draw_frame()
     current,
     #self.matches,
     status and (" · " .. status) or "",
-    marked > 0 and (" · " .. marked .. " selected") or ""
+    (marked > 0 and (" · " .. marked .. " selected") or "") .. (self.truncated and " · Limit reached" or "")
   )
   count = vim.fn.strcharpart(count, 0, self.resolved.width - 1)
   local input_width = self.resolved.width - vim.fn.strdisplaywidth(count)
@@ -443,7 +443,7 @@ end
 function Picker:_find()
   self:_cancel_finder()
   local generation = self.generation
-  self.loading, self.error = true, nil
+  self.loading, self.error, self.truncated = true, nil, nil
   self:_set_items({})
   local function current()
     return not self.closed and self.generation == generation
@@ -467,10 +467,40 @@ function Picker:_find()
       end
     end)
   end
-  ctx.done = function()
+  ctx.append_items = function(items)
+    vim.schedule(function()
+      if not current() then
+        return
+      end
+      local ok, err = pcall(function()
+        for _, item in ipairs(items) do
+          local raw = tostring(self.opts.format_item and self.opts.format_item(item) or item)
+          local display = single_line(raw)
+          self.entries[#self.entries + 1] = {
+            item = item,
+            index = #self.entries + 1,
+            text = display,
+            raw_text = (self.opts.highlight_item or self.opts.syntax.enabled) and raw ~= display and raw or nil,
+          }
+        end
+        self.matcher:set_entries(self.entries)
+        if self.opts.match == false then
+          self.matches = self.entries
+          self:_render()
+        else
+          self:_filter()
+        end
+      end)
+      if not ok then
+        ctx.fail(err)
+      end
+    end)
+  end
+  ctx.done = function(status)
     vim.schedule(function()
       if current() then
         self.loading = false
+        self.truncated = status and status.truncated
         self:_apply_restore()
         self:_render()
       end
