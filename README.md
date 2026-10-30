@@ -239,3 +239,5 @@ python3 tests/tui.py
 - `commands()`：搜索内置、全局和当前缓冲区命令；默认填入命令行以便补充参数，execute=true 可直接执行。
 
 - `autocmds()`：搜索事件、分组、pattern 和说明，预览完整定义；确认后定位 Lua 定义或打开只读详情。
+
+- `keymaps()`：搜索全局及当前缓冲区各模式映射，预览定义；确认后沿用 Snacks 的 Normal 模式按键回放。action="definition" 可改为定位定义。

@@ -355,6 +355,24 @@ test("autocommands show metadata without executing the event", function()
   vim.api.nvim_del_augroup_by_id(group)
 end)
 
+test("keymap search prefers local mappings and replays the confirmed keys", function()
+  vim.keymap.set("n", "<F6>", function()
+    vim.g.selection_map_test = "global"
+  end, { desc = "selection_map_test" })
+  vim.keymap.set("n", "<F6>", function()
+    vim.g.selection_map_test = "buffer"
+  end, { buffer = 0, desc = "selection_map_test" })
+  local p = tools.keymaps({ modes = { "n" }, query = "selection_map_test" })
+  eq(#p.matches, 1)
+  assert(p:current().text:find("buffer", 1, true))
+  p:confirm()
+  vim.api.nvim_feedkeys("", "x", false)
+  eq(vim.g.selection_map_test, "buffer")
+  vim.keymap.del("n", "<F6>", { buffer = 0 })
+  vim.keymap.del("n", "<F6>")
+  vim.g.selection_map_test = nil
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

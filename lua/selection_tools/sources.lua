@@ -16,6 +16,7 @@ local M = {
     "loclist",
     "commands",
     "autocmds",
+    "keymaps",
   },
 }
 
