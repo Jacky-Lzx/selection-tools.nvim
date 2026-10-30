@@ -6,6 +6,7 @@
 
 - Neovim 0.10+
 - 文件搜索需要 `fd` 或 `rg`（优先使用 `fd`）；普通列表选择无需外部程序
+- 文件类型图标可选使用 `nvim-web-devicons`；Nerd Font 用于显示文件和目录字形
 - 大列表可选使用 `sk`（skim），已验证 5.8.0；缺少或不兼容时自动回退原生匹配
 
 ## 安装与配置
@@ -56,6 +57,29 @@ selection.buffers({ current = false }) -- 排除当前 buffer
 ```
 
 `cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；支持实时全文搜索。
+
+## 条目图标
+
+文件、buffer、grep、最近文件等带文件位置的条目默认显示独立的图标列，项目目录显示文件夹图标。首次显示文件条目时按需加载可选的 `nvim-web-devicons`，使用其文件类型图标及高亮组；未安装时显示默认文件图标。仅为可见条目解析图标，并缓存本次候选的结果。
+
+图标和多选标记均独立于搜索文本，不参与 native/skim 匹配、排序或复制路径。图标列按显示宽度对齐，支持窄字符、宽字符和 Emoji。
+
+```lua
+-- 全局关闭，也可以给 files()/buffers()/open() 等单次调用传入相同选项。
+require("selection_tools").setup({ item_icons = { enabled = false } })
+
+-- 自定义来源：返回字形和高亮组名称，nil 表示该项不显示图标。
+require("selection_tools").open({
+  item_icons = { enabled = true }, -- 本次调用开启图标
+  items = { { text = "Lua task", icon = "λ", icon_hl = "Special" } },
+  format_item = function(item) return item.text end,
+  format_icon = function(item, original_index)
+    return item.icon, item.icon_hl
+  end,
+})
+```
+
+`format_icon` 覆盖自动文件图标解析，同样只对可见条目调用。`item_icons = false` 也可关闭图标，包括自定义回调。这里的 `item_icons` 控制列表装饰，与 `icons()` 图标选择器的自定义目录选项 `icons` 分开。
 
 ## 匹配后端
 
@@ -203,6 +227,7 @@ stylua --check lua plugin tests
 nvim --headless -u NONE -n -i NONE -l tests/run.lua
 nvim --headless -u NONE -n -i NONE -l tests/sources.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
+nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 python3 tests/tui.py
 ```
 

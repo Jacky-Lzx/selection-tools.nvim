@@ -5,6 +5,7 @@ import fcntl
 import os
 from pathlib import Path
 import pty
+import re
 import select
 import shutil
 import struct
@@ -33,6 +34,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "item_icons_tui":
+            actions.update(select=b"\t", copy=b"\x19")
         if case == "lazy_tui":
             actions.update(type_again=b"bta", close_warm=b"\x1b")
         if case == "preview_tui":
@@ -59,6 +62,9 @@ def run_case(case):
             result_file = Path(directory, "result")
             result = result_file.read_text().strip() if result_file.exists() else "No terminal test result"
             assert process.returncode == 0 and result.startswith("PASS"), result + "\n" + output.decode(errors="replace")[-3000:]
+            if case == "item_icons_tui":
+                assert re.search(rb"\x1b\[[0-9;]*38;2;18;52;86(?:;[0-9;]*)?m", output), "Lua icon RGB color was not sent to the terminal"
+                assert re.search(rb"\x1b\[[0-9;]*38;2;207;52;103(?:;[0-9;]*)?m", output), "Python icon RGB color was not sent to the terminal"
             print(result)
         finally:
             if process.poll() is None:
@@ -71,6 +77,7 @@ if __name__ == "__main__":
     run_case("tui")
     run_case("preview_tui")
     run_case("lazy_tui")
+    run_case("item_icons_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:

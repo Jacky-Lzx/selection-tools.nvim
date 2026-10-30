@@ -71,6 +71,8 @@ Highlight groups (all use default links and may be overridden):
   SelectionToolsBorder       FloatBorder
   SelectionToolsSelected     Visual
   SelectionToolsMatch        Search
+  SelectionToolsFileIcon     Comment
+  SelectionToolsDirectoryIcon Directory
 
 ===============================================================================
 2. USAGE                                              *selection-tools-usage*
@@ -121,7 +123,11 @@ selection.select(items, opts, on_choice)
 selection.open(opts)
     Open a picker with items or finder. Returns a picker. Options:
       items          Candidate list.
-      format_item    Display function: fun(item): string.
+      format_item    Searchable label: fun(item): string.
+      item_icons     { enabled=true }. false or { enabled=false } disables
+                     automatic and custom item icons.
+      format_icon    Optional fun(item, original_index): glyph, highlight_group.
+                     Overrides automatic file icons; nil means no icon.
       prompt         Window title; default 'Select'.
       query          Initial query; default ''.
       on_choice      Optional fun(item, original_index); nils on cancellation.
@@ -146,6 +152,18 @@ selection.open(opts)
                      set_lines is safe from async callbacks. Late results
                      are ignored. The built-in previewer reads files
                      asynchronously and prefers unsaved loaded buffers.
+
+File-like items (file, bufnr or buf) display file type icons; dir items display
+folder icons. The optional nvim-web-devicons provider loads only when a file
+icon is needed. Exact filenames and compound extensions are preserved; buffer
+filetypes provide a fallback. Without the provider, a default file glyph is
+used. A Nerd Font is needed for Nerd Font glyphs.
+
+Only visible entries resolve icons, cached until their candidates are replaced.
+The icon column aligns by display cells. Icon colors use their own highlight
+spans, independently of match highlights and multi-select markers. Icons do not
+change searchable text, matcher payloads, copied values or selection indices.
+format_icon receives the original object and index, even after filtering.
 
 With multi=true, on_choice receives marked items as an additional third
 argument; with no marks it contains the current item. The first two arguments

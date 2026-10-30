@@ -2,6 +2,7 @@ local M = {}
 
 local defaults = {
   ui_select = false,
+  item_icons = { enabled = true },
   layout = {
     width = 0.6,
     height = 0.5,

@@ -173,6 +173,23 @@ function Picker:_filter()
   end)
 end
 
+function Picker:_icon(entry)
+  local config = self.opts.item_icons
+  if config == false or (type(config) == "table" and config.enabled == false) then
+    return
+  end
+  local item = entry.item
+  if
+    not self.opts.format_icon and not (type(item) == "table" and (item.file or item.dir or item.bufnr or item.buf))
+  then
+    return
+  end
+  if not self.icon_resolver then
+    self.icon_resolver = require("selection_tools.item_icons").new(self.opts)
+  end
+  return self.icon_resolver(entry)
+end
+
 function Picker:_render()
   if self.closed or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
     return
@@ -187,7 +204,8 @@ function Picker:_render()
   local lines = {}
   self.row_to_index = {}
   local reverse = self.opts.layout.reverse
-  local prefix = self.opts.multi and 2 or 0
+  local mark_width = self.opts.multi and 2 or 0
+  local icons, icon_width, prefixes = {}, 0, {}
   if reverse and count > 0 then
     for row = 1, self.height do
       lines[row] = ""
@@ -196,8 +214,21 @@ function Picker:_render()
   for i = self.offset + 1, math.min(count, self.offset + self.height) do
     local row = reverse and (self.height - (i - self.offset) + 1) or (i - self.offset)
     local entry = self.matches[i]
-    lines[row] = (self.opts.multi and (self.marks[entry.index] and "* " or "  ") or "") .. entry.text
     self.row_to_index[row] = i
+    local icon = self:_icon(entry)
+    if icon then
+      icons[row] = icon
+      icon_width = math.max(icon_width, 2, vim.fn.strdisplaywidth(icon.text))
+    end
+  end
+  for row, index in pairs(self.row_to_index) do
+    local entry = self.matches[index]
+    local prefix = self.opts.multi and (self.marks[entry.index] and "* " or "  ") or ""
+    if icon_width > 0 then
+      local glyph = icons[row] and icons[row].text or ""
+      prefix = prefix .. glyph .. string.rep(" ", icon_width - vim.fn.strdisplaywidth(glyph) + 1)
+    end
+    prefixes[row], lines[row] = #prefix, prefix .. entry.text
   end
   if count == 0 then
     lines[1] = self.error and ("Error: " .. single_line(self.error))
@@ -210,14 +241,22 @@ function Picker:_render()
   api.nvim_buf_clear_namespace(self.list_buf, ns, 0, -1)
   if count > 0 then
     for row, index in pairs(self.row_to_index) do
+      local icon = icons[row]
+      if icon then
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, mark_width, {
+          end_col = mark_width + #icon.text,
+          hl_group = icon.hl,
+          priority = 120,
+        })
+      end
       if not self.positions[index] and self.match_backend == "skim" then
         -- Only visible rows need highlight positions from the native matcher.
         self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
           or {}
       end
       for _, pos in ipairs(self.positions[index] or {}) do
-        local start = vim.fn.byteidx(self.matches[index].text, pos) + prefix
-        local finish = vim.fn.byteidx(self.matches[index].text, pos + 1) + prefix
+        local start = vim.fn.byteidx(self.matches[index].text, pos) + prefixes[row]
+        local finish = vim.fn.byteidx(self.matches[index].text, pos + 1) + prefixes[row]
         api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, start, {
           end_col = finish,
           hl_group = "SelectionToolsMatch",
@@ -733,6 +772,8 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
   api.nvim_set_hl(0, "SelectionToolsMatch", { default = true, link = "Search" })
   api.nvim_set_hl(0, "SelectionToolsCount", { default = true, link = "Comment" })
+  api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
+  api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })
   self:_events()
   active = self
   self.started = true
@@ -745,6 +786,10 @@ function Picker:_mount(resolved)
 end
 
 function Picker.new(opts)
+  assert(
+    opts.format_icon == nil or type(opts.format_icon) == "function",
+    "selection-tools: format_icon must be a function"
+  )
   assert(type(opts.items) == "table" or type(opts.finder) == "function", "selection-tools: supply items or finder")
   local self = setmetatable({
     opts = opts,
