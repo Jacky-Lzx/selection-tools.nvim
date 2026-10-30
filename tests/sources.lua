@@ -271,6 +271,15 @@ test("search history restores the search register and searches the original wind
   vim.bo.modified = false
 end)
 
+test("command history runs the confirmed command in the original window", function()
+  vim.fn.histadd(":", "let g:selection_history_test = 42")
+  local p = tools.command_history({ query = "selection_history_test" })
+  eq(#p.matches, 1)
+  p:confirm()
+  eq(vim.g.selection_history_test, 42)
+  vim.g.selection_history_test = nil
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

@@ -11,6 +11,7 @@ local M = {
     "marks",
     "undo",
     "search_history",
+    "command_history",
   },
 }
 
