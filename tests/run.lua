@@ -489,6 +489,70 @@ test("file preview is asynchronous, highlighted and does not create a file buffe
   eq(vim.api.nvim_get_current_buf(), before)
 end)
 
+test("file switches preserve the displayed preview until the latest read completes", function()
+  for _, name in ipairs({ "keep.lua", "skip.txt", "latest.lua" }) do
+    vim.fn.writefile({ name .. " contents" }, fixture .. "/" .. name)
+  end
+  local read, hold, pending = vim.uv.fs_read, false, {}
+  vim.uv.fs_read = function(fd, size, offset, callback)
+    return read(fd, size, offset, function(err, data)
+      if hold then
+        pending[#pending + 1] = function()
+          callback(err, data)
+        end
+      else
+        callback(err, data)
+      end
+    end)
+  end
+  local p
+  local ok, err = xpcall(function()
+    p = tools.open({
+      items = {
+        { file = fixture .. "/keep.lua" },
+        { file = fixture .. "/skip.txt" },
+        { file = fixture .. "/latest.lua" },
+      },
+      preview = { enabled = true },
+    })
+    local function contents()
+      return vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false)
+    end
+    assert(vim.wait(5000, function()
+      return contents()[1] == "keep.lua contents"
+    end, 5))
+    local tick = vim.api.nvim_buf_get_changedtick(p.preview_buf)
+    hold = true
+    p:move(1)
+    eq(contents(), { "keep.lua contents" })
+    eq(vim.bo[p.preview_buf].filetype, "lua")
+    assert(vim.wait(5000, function()
+      return #pending == 1
+    end, 5))
+    p:move(1)
+    assert(vim.wait(5000, function()
+      return #pending == 2
+    end, 5))
+    eq(vim.api.nvim_buf_get_changedtick(p.preview_buf), tick)
+    table.remove(pending, 1)()
+    drain()
+    eq(contents(), { "keep.lua contents" })
+    table.remove(pending, 1)()
+    drain()
+    eq(contents(), { "latest.lua contents" })
+    eq(vim.api.nvim_get_current_win(), p.input_win)
+  end, debug.traceback)
+  hold, vim.uv.fs_read = false, read
+  if p then
+    p:close()
+  end
+  for _, complete in ipairs(pending) do
+    complete()
+  end
+  drain()
+  assert(ok, err)
+end)
+
 test("buffer preview shows unsaved text without modifying the source buffer", function()
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_buf_set_name(buf, fixture .. "/dirty-buffer.lua")

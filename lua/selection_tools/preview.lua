@@ -40,6 +40,7 @@ function Preview:write(lines, ft, title, pos)
     end)
   end
   self.picker.preview_title = title or "Preview"
+  self.displayed = true
   self.picker:_draw_frame()
 end
 
@@ -81,6 +82,7 @@ function Preview:update(item, index)
         vim.cmd("normal! zz")
       end)
       self.picker.preview_title = "Preview"
+      self.displayed = true
       self.picker:_draw_frame()
     else
       self:write({ "No preview" })
@@ -134,7 +136,11 @@ function Preview:update(item, index)
     path = vim.fs.joinpath(opts.cwd or vim.fn.getcwd(), path)
   end
   local title = vim.fn.fnamemodify(path, ":t"):gsub("[\r\n]", " ")
-  self:write({ "Loading…" }, nil, title)
+  -- Keep the previous contents, highlighting and scroll position during I/O.
+  -- Only the first preview needs a loading placeholder.
+  if not self.displayed then
+    self:write({ "Loading…" }, nil, title)
+  end
   local ft = vim.filetype.match({ filename = path })
   uv.fs_open(path, "r", 438, function(open_err, fd)
     if not fd then

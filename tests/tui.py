@@ -33,6 +33,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "preview_tui":
+            actions.update(move_again=b"\x0e")
         handled = set()
         output = bytearray()
         deadline = time.monotonic() + 15
@@ -65,6 +67,7 @@ def run_case(case):
 
 if __name__ == "__main__":
     run_case("tui")
+    run_case("preview_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:
