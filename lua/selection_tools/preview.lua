@@ -21,6 +21,18 @@ function Preview:write(lines, ft, title, pos)
   if self.picker.preview_win and api.nvim_win_is_valid(self.picker.preview_win) then
     api.nvim_win_set_buf(self.picker.preview_win, self.buf)
   end
+  if type(self.item) == "table" then
+    ft = self.item.ft or ft
+    if not pos and self.item.search then
+      for row, line in ipairs(lines) do
+        local col = line:find(self.item.search, 1, true)
+        if col then
+          pos = { row, col - 1 }
+          break
+        end
+      end
+    end
+  end
   pcall(vim.treesitter.stop, self.buf)
   vim.bo[self.buf].modifiable = true
   api.nvim_buf_set_lines(self.buf, 0, -1, false, #lines > 0 and lines or { "" })

@@ -241,3 +241,5 @@ python3 tests/tui.py
 - `autocmds()`：搜索事件、分组、pattern 和说明，预览完整定义；确认后定位 Lua 定义或打开只读详情。
 
 - `keymaps()`：搜索全局及当前缓冲区各模式映射，预览定义；确认后沿用 Snacks 的 Normal 模式按键回放。action="definition" 可改为定位定义。
+
+- `help()`：搜索 runtime 中的 help tags，预览定位到标签，确认后打开原生帮助文档。

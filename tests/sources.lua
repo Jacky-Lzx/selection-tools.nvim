@@ -373,6 +373,26 @@ test("keymap search prefers local mappings and replays the confirmed keys", func
   vim.g.selection_map_test = nil
 end)
 
+test("help tags preview the definition and open native help", function()
+  vim.fn.mkdir(fixture .. "/help/doc", "p")
+  vim.fn.writefile({ "intro", "", "*selection-tools-test-tag* Test help" }, fixture .. "/help/doc/selection-test.txt")
+  vim.fn.writefile(
+    { "selection-tools-test-tag\tselection-test.txt\t/*selection-tools-test-tag*" },
+    fixture .. "/help/doc/tags"
+  )
+  vim.opt.runtimepath:prepend(fixture .. "/help")
+  local p = tools.help({ query = "selection-tools-test-tag" })
+  eq(#p.matches, 1)
+  assert(vim.wait(1000, function()
+    return vim.api.nvim_win_get_cursor(p.preview_win)[1] == 3
+  end, 2))
+  eq(vim.bo[p.preview_buf].filetype, "help")
+  p:confirm()
+  eq(vim.bo.buftype, "help")
+  eq(vim.api.nvim_win_get_cursor(0)[1], 3)
+  vim.opt.runtimepath:remove(fixture .. "/help")
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
