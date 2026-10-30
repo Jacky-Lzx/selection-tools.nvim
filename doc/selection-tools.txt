@@ -1,0 +1,150 @@
+*selection-tools.txt*  Searchable lists and built-in sources for Neovim
+
+===============================================================================
+CONTENTS                                                    *selection-tools*
+
+  1. Setup                          |selection-tools-setup|
+  2. Usage                          |selection-tools-usage|
+  3. Public API                     |selection-tools-api|
+  4. Finder contract                |selection-tools-finder|
+  5. Picker methods                 |selection-tools-methods|
+
+Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua dependencies.
+
+===============================================================================
+1. SETUP                                              *selection-tools-setup*
+>lua
+    require('selection_tools').setup({
+      ui_select = false,
+      layout = { width = 0.6, height = 0.5, border = 'rounded' },
+      keys = {
+        confirm = { '<CR>' },
+        close = { '<Esc>', '<C-c>' },
+        next = { '<C-n>', '<Down>' },
+        previous = { '<C-p>', '<Up>' },
+      },
+    })
+<
+Setup is optional. Width/height values <= 1 are fractions of available space;
+larger values are columns/rows. Size is clamped to the editor. The picker needs
+at least 12 columns and 8 usable rows. Border accepts |nvim_open_win()| styles.
+
+Key lists replace the defaults for that action. Use {} to disable an action.
+Bindings are local to picker buffers. The results buffer also maps j/k for
+navigation and / to focus the search input in Insert mode.
+
+ui_select=true installs the |vim.ui.select()| adapter. Calling setup with false
+restores the previous implementation only if our adapter still owns the slot.
+Load the plugin before callers if you want it to handle vim.ui.select calls.
+Only the base select contract is implemented; preview_item is not supported.
+
+Highlight groups (all use default links and may be overridden):
+  SelectionToolsBorder       FloatBorder
+  SelectionToolsSelected     Visual
+  SelectionToolsMatch        Search
+
+===============================================================================
+2. USAGE                                              *selection-tools-usage*
+
+:SelectionTools [source]                                    *:SelectionTools*
+    Open a registered source. Defaults to files. Supports source completion.
+
+Built-in sources:
+  files    Asynchronously enumerate files, then filter the cached list locally.
+           Prefer fd; use rg if fd is unavailable. Ignore rules are respected.
+           hidden=true includes hidden files. ignored=true disables ignore
+           rules. .git is always excluded. cwd defaults to the calling cwd;
+           expand ~ or environment variables before passing a path.
+  buffers  Listed buffers, current first then most recently used. Pass
+           current=false to exclude the current buffer.
+
+Type to search with case-insensitive fuzzy matching. Enter confirms. Enter
+with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
+cancels the old one. Leaving the picker windows cancels it. External window
+closure and input buffer destruction also clean up the picker.
+
+This version supports single selection. Preview, multiple selection, and live
+grep are not included.
+
+===============================================================================
+3. PUBLIC API                                           *selection-tools-api*
+>lua
+    local selection = require('selection_tools')
+<
+selection.select(items, opts, on_choice)
+    Open a searchable list. Supports arbitrary Lua values. format_item(item)
+    returns the displayed/searchable string; defaults to tostring(item).
+    on_choice(item, index) receives the original value and original 1-based
+    index, even after filtering. Cancellation passes nil, nil. The callback
+    runs once, after cleanup and focus restoration. Returns a picker.
+
+selection.open(opts)
+    Open a picker with items or finder. Returns a picker. Options:
+      items          Candidate list.
+      format_item    Display function: fun(item): string.
+      prompt         Window title; default 'Select'.
+      query          Initial query; default ''.
+      on_choice      Optional fun(item, original_index); nils on cancellation.
+      finder         Asynchronous/synchronous producer; see below.
+      live           Restart finder when query changes; default false.
+      match          Locally fuzzy-match results; default true. Set false if
+                     a live source already filters/sorts candidates.
+      cwd            Source context cwd; default current directory.
+      layout, keys   Per-call overrides of setup options.
+
+selection.register_source(name, source)
+    Register or replace a source (including a built-in). Name must contain
+    only letters, digits, underscores or hyphens. Source is an options table
+    or a function(opts) returning an options table.
+
+selection.pick(name, opts)
+    Resolve a source, merge per-call opts over its defaults, and open it.
+    Unknown sources raise an error. Returns a picker.
+
+selection.files(opts)
+selection.buffers(opts)
+    Shortcuts for pick('files', opts) and pick('buffers', opts).
+
+selection.sources()
+    Return the sorted list of built-in and registered source names.
+
+===============================================================================
+4. FINDER CONTRACT                                   *selection-tools-finder*
+
+finder(ctx) is called once initially, or again on every query change if live
+is true. It should return quickly; use async I/O for expensive work. Optional
+return value: a cancellation function. Slow live sources may debounce in their
+own finder and cancel their timer in this function.
+
+Context:
+  ctx.query              Query snapshot for this invocation.
+  ctx.cwd                Calling cwd or explicit cwd.
+  ctx.is_cancelled()     True if closed or superseded by another query.
+  ctx.set_items(items)   Replace the complete list, retaining original values.
+  ctx.done()             Clear loading state.
+  ctx.fail(message)      Display and notify an error, clear loading state.
+
+The delivery methods schedule onto Neovim's event loop, so they may be called
+from fast callbacks. Call set_items before done. Repeated set_items calls are
+allowed. Calls after cancellation are ignored. The cancel function executes
+when the picker closes or the finder is superseded, even if done was called;
+it should be safe after completion.
+
+Live searches clear previous candidates before starting the new finder. Static
+searches continue filtering cached candidates while typing. Local fuzzy matching
+uses text only; Lua objects/functions are never passed through Vimscript.
+
+===============================================================================
+5. PICKER METHODS                                   *selection-tools-methods*
+
+picker:set_query(query)    Replace input and refresh filtering/search.
+picker:set_items(items)    Replace candidates and refresh filtering.
+picker:move(delta)         Move selection, wrapping at either end.
+picker:current()           Return item, original_index; nils with no selection.
+picker:confirm()           Close and choose current item; no-op without matches.
+picker:close()             Cancel. Repeated close calls are harmless.
+
+Methods that modify a closed picker are no-ops. Treat all other fields as
+internal implementation details.
+
+vim:tw=78:ts=8:ft=help:norl:
