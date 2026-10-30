@@ -114,6 +114,14 @@ added to the buffer list; confirmation displays the first marked file.
 The grep source performs live full-text search using ripgrep JSON output.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
+Visible grep code snippets reuse complete-file Tree-sitter contexts, including
+injections and multiline strings. Loaded buffers are read without modification;
+other files load asynchronously. Queries use the current runtime's highlights.
+Only visible rows extract captures, and the bounded document cache keeps at
+least cache_size or the number of visible rows. New queries validate disk
+metadata; changed buffer ticks refresh buffer snapshots. Missing parsers/queries
+and files over the limits keep plain code plus query matches.
+
 Every nonempty ripgrep submatch is highlighted in the result label, including
 multiple hits per line and regex matches. Matches in the filename are excluded.
 Confirming a result opens its exact file/line/column; an empty query does not
@@ -156,6 +164,11 @@ selection.open(opts)
       match          Locally fuzzy-match results; default true. Set false if
                      a live source already filters/sorts candidates.
       cwd            Source context cwd; default current directory.
+      syntax         { enabled=false, max_size=1048576, max_lines=10000,
+                       cache_size=8 }. grep enables this by default. Applies
+                       native Tree-sitter captures to item.code at the byte
+                       offset item.content_offset within the formatted label;
+                       item.file and item.pos identify the full source context.
       layout, keys   Per-call overrides of setup options.
       multi          Enable marks; default false, true for files/buffers.
       preview        { enabled=false, max_size=1048576, max_lines=10000,
@@ -190,6 +203,11 @@ still identify the current item. Cancellation does not return marked items.
 Marks survive local filtering but are cleared when the source replaces items.
 Binary and oversized files show an explanatory preview message. Preview
 scrolling preserves the input focus; preview never edits source buffers.
+Explicit preview positions mark the target line with SelectionToolsPreviewLine.
+Grep supplies item.line_matches as zero-based, end-exclusive byte ranges on that
+line, highlighted with SelectionToolsPreviewMatch. The original item.code guards
+against applying stale matches to changed buffer text. Caller-owned preview_item
+buffers are not decorated or modified by this feature.
 
 selection.register_source(name, source)
     Register or replace a source (including a built-in). Name must contain

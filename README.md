@@ -81,6 +81,21 @@ require("selection_tools").open({
 
 `format_icon` 覆盖自动文件图标解析，同样只对可见条目调用。`item_icons = false` 也可关闭图标，包括自定义回调。这里的 `item_icons` 控制列表装饰，与 `icons()` 图标选择器的自定义目录选项 `icons` 分开。
 
+## Grep 代码配色与预览定位
+
+`<Space>sg` 使用的 `grep()` 默认给条目中的代码应用 Tree-sitter 配色，沿用当前 runtime 的语言、注入及 `highlights` 查询。解析基于完整文件上下文，能区分跨行字符串中的文字和独立代码；文件名、行列号及图标保留各自样式，搜索命中继续叠加高亮。
+
+只处理进入可见区域的文件和代码行，异步读取并复用解析结果；优先使用已加载 buffer 的未保存内容，不创建或修改源文件 buffer。磁盘缓存在新查询时检查元数据，buffer 缓存按 changedtick 更新。缺少语言解析器/查询或超过限制时保留普通文本及搜索高亮，不会自动安装解析器。
+
+```lua
+require("selection_tools").grep({
+  syntax = { enabled = true, max_size = 1024 * 1024, max_lines = 10000, cache_size = 8 },
+  preview = { highlight_line = true, highlight_matches = true },
+})
+```
+
+`syntax.enabled = false` 关闭条目代码配色。文档缓存至少容纳可见行数量，避免多文件列表反复解析。预览中的当前结果行使用 `SelectionToolsPreviewLine`（默认 `CursorLine`），匹配内容使用 `SelectionToolsPreviewMatch`（默认 `Search`）；两者可分别关闭。预览切换会同步更新这些标记；如果 buffer 正文已与磁盘搜索结果不同，则不套用过期的匹配范围。
+
 ## 匹配后端
 
 ```lua
@@ -230,6 +245,7 @@ nvim --headless -u NONE -n -i NONE -l tests/run.lua
 nvim --headless -u NONE -n -i NONE -l tests/sources.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
+nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 python3 tests/tui.py
 ```
 

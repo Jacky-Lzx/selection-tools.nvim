@@ -6,6 +6,7 @@ return function(opts)
     cwd = vim.fn.fnamemodify(opts.cwd or vim.fn.getcwd(), ":p"),
     live = true,
     match = false,
+    syntax = { enabled = true },
     multi = true,
     preview = { enabled = true },
     format_item = util.format,

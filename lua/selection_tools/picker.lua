@@ -143,7 +143,7 @@ function Picker:_set_items(items)
       item = item,
       index = index,
       text = display,
-      raw_text = self.opts.highlight_item and raw ~= display and raw or nil,
+      raw_text = (self.opts.highlight_item or self.opts.syntax.enabled) and raw ~= display and raw or nil,
     }
   end
   self.entries, self.marks = entries, {}
@@ -202,6 +202,38 @@ function Picker:_icon(entry)
   return self.icon_resolver(entry)
 end
 
+local function map_ranges(entry, ranges)
+  local highlights = {}
+  local raw = entry.raw_text or entry.text
+  local boundaries = {}
+  for _, range in ipairs(type(ranges) == "table" and ranges or {}) do
+    if type(range) == "table" and type(range[1]) == "number" and type(range[2]) == "number" then
+      local first = math.max(0, math.min(#raw, math.floor(range[1])))
+      local last = math.max(0, math.min(#raw, math.floor(range[2])))
+      if first < last then
+        highlights[#highlights + 1] = { first, last, hl = range.hl, priority = range.priority }
+        boundaries[first], boundaries[last] = first, last
+      end
+    end
+  end
+  if entry.raw_text then
+    local offsets = vim.tbl_keys(boundaries)
+    table.sort(offsets)
+    local controls = raw:gmatch("()[\r\n\t%z]")
+    local next_control, added = controls(), 0
+    for _, offset in ipairs(offsets) do
+      while next_control and next_control <= offset do
+        added, next_control = added + 1, controls()
+      end
+      boundaries[offset] = offset + added
+    end
+    for _, range in ipairs(highlights) do
+      range[1], range[2] = boundaries[range[1]], boundaries[range[2]]
+    end
+  end
+  return highlights
+end
+
 -- Source ranges use zero-based byte offsets in the formatted label. Resolve only
 -- visible entries and account for the renderer escaping tabs and control bytes.
 function Picker:_highlights(entry)
@@ -220,34 +252,38 @@ function Picker:_highlights(entry)
     end
     return entry.highlights
   end
-  local raw = entry.raw_text or entry.text
-  local boundaries = {}
-  for _, range in ipairs(type(ranges) == "table" and ranges or {}) do
-    if type(range) == "table" and type(range[1]) == "number" and type(range[2]) == "number" then
-      local first = math.max(0, math.min(#raw, math.floor(range[1])))
-      local last = math.max(0, math.min(#raw, math.floor(range[2])))
-      if first < last then
-        entry.highlights[#entry.highlights + 1] = { first, last }
-        boundaries[first], boundaries[last] = first, last
-      end
-    end
-  end
-  if entry.raw_text then
-    local offsets = vim.tbl_keys(boundaries)
-    table.sort(offsets)
-    local controls = raw:gmatch("()[\r\n\t%z]")
-    local next_control, added = controls(), 0
-    for _, offset in ipairs(offsets) do
-      while next_control and next_control <= offset do
-        added, next_control = added + 1, controls()
-      end
-      boundaries[offset] = offset + added
-    end
-    for _, range in ipairs(entry.highlights) do
-      range[1], range[2] = boundaries[range[1]], boundaries[range[2]]
-    end
-  end
+  entry.highlights = map_ranges(entry, ranges)
   return entry.highlights
+end
+
+function Picker:_syntax(entry)
+  local item = entry.item
+  if
+    not self.opts.syntax.enabled
+    or type(item) ~= "table"
+    or not item.file
+    or not item.pos
+    or not item.code
+    or not item.content_offset
+  then
+    return {}
+  end
+  if not self.syntax then
+    self.syntax = require("selection_tools.syntax").new(self)
+  end
+  local spans = self.syntax:highlights(item)
+  if not spans then
+    return {}
+  end
+  if entry.syntax_source ~= spans then
+    local ranges = {}
+    for _, span in ipairs(spans) do
+      ranges[#ranges + 1] =
+        { item.content_offset + span[1], item.content_offset + span[2], hl = span.hl, priority = span.priority }
+    end
+    entry.syntax_source, entry.syntax_ranges = spans, map_ranges(entry, ranges)
+  end
+  return entry.syntax_ranges
 end
 
 function Picker:_render()
@@ -314,6 +350,13 @@ function Picker:_render()
         self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
           or {}
       end
+      for _, span in ipairs(self:_syntax(self.matches[index])) do
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, prefixes[row] + span[1], {
+          end_col = prefixes[row] + span[2],
+          hl_group = span.hl,
+          priority = span.priority,
+        })
+      end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
         api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, prefixes[row] + range[1], {
           end_col = prefixes[row] + range[2],
@@ -338,7 +381,7 @@ function Picker:_render()
       ns,
       row - 1,
       0,
-      { end_row = row, end_col = 0, hl_group = "SelectionToolsSelected", hl_eol = true, priority = 100 }
+      { end_row = row, end_col = 0, hl_group = "SelectionToolsSelected", hl_eol = true, priority = 90 }
     )
     api.nvim_win_set_cursor(self.list_win, { row, 0 })
   else
@@ -604,6 +647,9 @@ function Picker:close(item, index, selected)
   self.closed = true
   self.matching = false
   self.matcher:cancel()
+  if self.syntax then
+    self.syntax:close()
+  end
   self:_cancel_finder()
   if self.preview then
     self.preview:cancel()

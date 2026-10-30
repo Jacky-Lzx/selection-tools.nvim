@@ -84,6 +84,7 @@ if __name__ == "__main__":
     run_case("item_icons_tui")
     run_case("match_tui")
     run_case("grep_tui")
+    run_case("syntax_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:

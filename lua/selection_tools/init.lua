@@ -3,6 +3,7 @@ local M = {}
 local defaults = {
   ui_select = false,
   item_icons = { enabled = true },
+  syntax = { enabled = false, max_size = 1024 * 1024, max_lines = 10000, cache_size = 8 },
   layout = {
     width = 0.6,
     height = 0.5,
