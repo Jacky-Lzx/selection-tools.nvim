@@ -100,8 +100,10 @@ with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
 cancels the old one. Leaving the picker windows cancels it. External window
 closure and input buffer destruction also clean up the picker.
 
-The match/total count appears at the right of the input row, with space reserved
-for it even when the query scrolls horizontally. Internal dividers join the
+The current-position/result-count indicator appears at the right of the input
+row, with space reserved even when the query scrolls horizontally. The position
+is 1-based within the filtered results; no matches displays 0/0. Loading and
+matching states are appended after the numeric indicator. Internal dividers join the
 outer border and do not display preview filenames. Previews use absolute line
 numbers.
 

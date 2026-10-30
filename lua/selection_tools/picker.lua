@@ -49,9 +49,14 @@ function Picker:_draw_frame()
   end
   self:_draw_separators()
   local marked = vim.tbl_count(self.marks)
-  local status = self.error and "Error"
-    or (self.loading and "Loading" or (self.matching and "Matching" or tostring(#self.entries)))
-  local count = (" %d/%s%s "):format(#self.matches, status, marked > 0 and (" · " .. marked .. " selected") or "")
+  local status = self.error and "Error" or (self.loading and "Loading" or (self.matching and "Matching" or nil))
+  local current = self.matches[self.index] and self.index or 0
+  local count = (" %d/%d%s%s "):format(
+    current,
+    #self.matches,
+    status and (" · " .. status) or "",
+    marked > 0 and (" · " .. marked .. " selected") or ""
+  )
   count = vim.fn.strcharpart(count, 0, self.resolved.width - 1)
   local input_width = self.resolved.width - vim.fn.strdisplaywidth(count)
   if api.nvim_win_get_width(self.input_win) ~= input_width then

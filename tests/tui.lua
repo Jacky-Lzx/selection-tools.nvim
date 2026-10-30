@@ -70,19 +70,21 @@ timer:start(
       ticks = ticks + 1
       assert(ticks < 300, "TUI test timed out at " .. stage)
       if stage == "input" and vim.api.nvim_get_mode().mode == "i" then
-        check_screen(" 3/3 ")
+        check_screen(" 1/3 ")
         mark("type_long")
         stage = "long_query"
       elseif stage == "long_query" and #p.query == 200 then
-        check_screen(" 0/3 ")
+        check_screen(" 0/0 ")
         mark("type")
         stage = "filter"
       elseif stage == "filter" and p.query == "bta" then
         assert(#p.matches == 2, "typed query did not filter")
+        check_screen(" 1/2 ")
         assert(vim.api.nvim_get_mode().mode == "i", "typing left Insert mode")
         mark("move")
         stage = "move"
       elseif stage == "move" and p.index == 2 then
+        check_screen(" 2/2 ")
         mark("confirm")
         stage = "confirm"
       elseif stage == "open_cancel" then

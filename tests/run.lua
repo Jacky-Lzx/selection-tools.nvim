@@ -336,7 +336,7 @@ test("invalid border and key configuration do not leak buffers or windows", func
   eq(calls, 0)
 end)
 
-test("counts share the input row and dividers join the frame without preview titles", function()
+test("counts track the current result and dividers join the frame without preview titles", function()
   for _, position in ipairs({ "top", "bottom" }) do
     local p = tools.open({
       items = { "alpha", "beta" },
@@ -359,7 +359,11 @@ test("counts share the input row and dividers join the frame without preview tit
       end
       error("missing input count")
     end
+    eq(count(), " 1/2 ")
+    p:move(1)
     eq(count(), " 2/2 ")
+    p:move(1)
+    eq(count(), " 1/2 ")
     eq(vim.api.nvim_win_get_config(p.frame_win).footer, nil)
     eq(vim.api.nvim_win_get_width(p.input_win) + vim.fn.strdisplaywidth(count()), p.resolved.width)
     eq(
@@ -376,9 +380,9 @@ test("counts share the input row and dividers join the frame without preview tit
     p:toggle()
     assert(count():find("1 selected", 1, true))
     p:set_query("beta")
-    assert(count():find("1/2", 1, true))
+    assert(count():find("1/1", 1, true))
     p:set_query(string.rep("long query ", 20))
-    eq(count():sub(1, 5), " 0/2 ")
+    eq(count():sub(1, 5), " 0/0 ")
     assert(vim.api.nvim_win_get_width(p.input_win) > 0)
     local wins, buf = vim.deepcopy(p.separator_wins), p.separator_buf
     p:close()
