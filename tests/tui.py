@@ -30,7 +30,7 @@ def main():
             cwd=root, env=env, stdin=slave, stdout=slave, stderr=slave,
         )
         os.close(slave)
-        actions = {"type": b"bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
+        actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         handled = set()
         output = bytearray()
         deadline = time.monotonic() + 15

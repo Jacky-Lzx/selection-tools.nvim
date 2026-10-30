@@ -336,6 +336,68 @@ test("invalid border and key configuration do not leak buffers or windows", func
   eq(calls, 0)
 end)
 
+test("counts share the input row and dividers join the frame without preview titles", function()
+  for _, position in ipairs({ "top", "bottom" }) do
+    local p = tools.open({
+      items = { "alpha", "beta" },
+      multi = true,
+      preview = { enabled = true },
+      previewer = function(ctx)
+        ctx.set_lines({ "first", "second" }, nil, "hidden-filename.lua")
+      end,
+      layout = { height = 0.9, input_position = position },
+    })
+    drain()
+    local function count()
+      local marks = vim.api.nvim_buf_get_extmarks(p.frame_buf, -1, 0, -1, { details = true })
+      for _, mark in ipairs(marks) do
+        if mark[4].virt_text then
+          eq(mark[2], position == "top" and 0 or p.resolved.total_height - 1)
+          eq(mark[4].virt_text_pos, "right_align")
+          return mark[4].virt_text[1][1]
+        end
+      end
+      error("missing input count")
+    end
+    eq(count(), " 2/2 ")
+    eq(vim.api.nvim_win_get_config(p.frame_win).footer, nil)
+    eq(vim.api.nvim_win_get_width(p.input_win) + vim.fn.strdisplaywidth(count()), p.resolved.width)
+    eq(
+      vim.api.nvim_buf_get_lines(p.separator_buf, 0, -1, false),
+      { "├" .. string.rep("─", p.resolved.width) .. "┤" }
+    )
+    for i, win in ipairs(p.separator_wins) do
+      local config = vim.api.nvim_win_get_config(win)
+      eq(config.row, p.resolved.frame.row + p.resolved.separators[i] + 1)
+      eq(config.col, p.resolved.frame.col)
+      eq(config.width, p.resolved.width + 2)
+    end
+    assert(vim.wo[p.preview_win].number and not vim.wo[p.preview_win].relativenumber)
+    p:toggle()
+    assert(count():find("1 selected", 1, true))
+    p:set_query("beta")
+    assert(count():find("1/2", 1, true))
+    p:set_query(string.rep("long query ", 20))
+    eq(count():sub(1, 5), " 0/2 ")
+    assert(vim.api.nvim_win_get_width(p.input_win) > 0)
+    local wins, buf = vim.deepcopy(p.separator_wins), p.separator_buf
+    p:close()
+    for _, win in ipairs(wins) do
+      assert(not vim.api.nvim_win_is_valid(win))
+    end
+    assert(not vim.api.nvim_buf_is_valid(buf))
+  end
+end)
+
+test("double borders use matching divider joints", function()
+  local p = tools.open({ items = { "item" }, layout = { border = "double" } })
+  eq(
+    vim.api.nvim_buf_get_lines(p.separator_buf, 0, -1, false),
+    { "╠" .. string.rep("═", p.resolved.width) .. "╣" }
+  )
+  p:close()
+end)
+
 test("vertical reversed layout keeps the best match next to the bottom input", function()
   local items = {}
   for i = 1, 80 do
@@ -402,6 +464,9 @@ test("short-screen resizing hides and restores preview without losing the query"
     vim.o.lines = lines
     vim.api.nvim_exec_autocmds("VimResized", {})
     assert(p.preview_win and not p.closed)
+    assert(vim.wo[p.preview_win].number and not vim.wo[p.preview_win].relativenumber)
+    eq(#p.separator_wins, 2)
+    eq(vim.api.nvim_win_get_width(p.input_win) + 5, p.resolved.width)
     eq(p:current(), "match")
   end)
   vim.o.lines = lines

@@ -47,22 +47,19 @@ function Picker:_draw_frame()
   for _, row in ipairs(self.resolved.separators) do
     api.nvim_buf_set_extmark(self.frame_buf, ns, row, 0, { line_hl_group = "SelectionToolsBorder" })
   end
-  if self.preview_title and self.resolved.preview then
-    local row = self.opts.layout.input_position == "bottom" and self.resolved.preview.height
-      or self.resolved.separators[#self.resolved.separators]
-    api.nvim_buf_set_extmark(self.frame_buf, ns, row, 0, {
-      virt_text = {
-        { " " .. vim.fn.strcharpart(single_line(self.preview_title), 0, self.resolved.width - 4) .. " ", "FloatTitle" },
-      },
-      virt_text_pos = "overlay",
-      virt_text_win_col = 1,
-    })
-  end
+  self:_draw_separators()
   local marked = vim.tbl_count(self.marks)
   local status = self.error and "Error" or (self.loading and "Loading" or tostring(#self.entries))
-  api.nvim_win_set_config(self.frame_win, {
-    footer = (" %d / %s%s "):format(#self.matches, status, marked > 0 and (" · " .. marked .. " selected") or ""),
-    footer_pos = "right",
+  local count = (" %d/%s%s "):format(#self.matches, status, marked > 0 and (" · " .. marked .. " selected") or "")
+  count = vim.fn.strcharpart(count, 0, self.resolved.width - 1)
+  local input_width = self.resolved.width - vim.fn.strdisplaywidth(count)
+  if api.nvim_win_get_width(self.input_win) ~= input_width then
+    api.nvim_win_set_config(self.input_win, { width = input_width })
+  end
+  local input_row = self.opts.layout.input_position == "bottom" and self.resolved.total_height - 1 or 0
+  api.nvim_buf_set_extmark(self.frame_buf, ns, input_row, 0, {
+    virt_text = { { count, "SelectionToolsCount" } },
+    virt_text_pos = "right_align",
   })
 end
 
@@ -74,6 +71,59 @@ local function scratch(filetype)
   vim.bo[buf].filetype = filetype
   vim.bo[buf].swapfile = false
   return buf
+end
+
+function Picker:_draw_separators()
+  -- Native float borders cannot change their side character on individual rows.
+  -- Overlay each divider across the sides as well, so the tee joints are continuous.
+  local border = api.nvim_win_get_config(self.frame_win).border or {}
+  local function char(index)
+    local value = border[index]
+    return type(value) == "table" and value[1] or (value or "")
+  end
+  local left, right = char(8), char(4)
+  local joints = { ["│"] = { "├", "┤" }, ["║"] = { "╠", "╣" }, ["┃"] = { "┣", "┫" } }
+  local horizontal = (left == "║" or right == "║") and "═"
+    or ((left == "┃" or right == "┃") and "━" or "─")
+  local line = (joints[left] and joints[left][1] or left)
+    .. string.rep(horizontal, self.resolved.width)
+    .. (joints[right] and joints[right][2] or right)
+  if not self.separator_buf or not api.nvim_buf_is_valid(self.separator_buf) then
+    self.separator_buf = scratch("selection_tools_separator")
+    self.separator_wins = {}
+  end
+  vim.bo[self.separator_buf].modifiable = true
+  api.nvim_buf_set_lines(self.separator_buf, 0, -1, false, { line })
+  vim.bo[self.separator_buf].modifiable = false
+  api.nvim_buf_set_extmark(self.separator_buf, ns, 0, 0, { id = 1, line_hl_group = "SelectionToolsBorder" })
+  for i, row in ipairs(self.resolved.separators) do
+    local config = {
+      relative = "editor",
+      style = "minimal",
+      border = "none",
+      row = self.resolved.frame.row + row + (char(2) ~= "" and 1 or 0),
+      col = self.resolved.frame.col,
+      width = vim.fn.strdisplaywidth(line),
+      height = 1,
+      zindex = 62,
+      focusable = false,
+    }
+    local win = self.separator_wins[i]
+    if win and api.nvim_win_is_valid(win) then
+      api.nvim_win_set_config(win, config)
+    else
+      win = api.nvim_open_win(self.separator_buf, false, config)
+      self.separator_wins[i] = win
+      vim.wo[win].wrap = false
+      vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
+    end
+  end
+  for i = #self.separator_wins, #self.resolved.separators + 1, -1 do
+    local win = table.remove(self.separator_wins, i)
+    if api.nvim_win_is_valid(win) then
+      api.nvim_win_close(win, true)
+    end
+  end
 end
 
 function Picker:_set_items(items)
@@ -388,13 +438,18 @@ function Picker:close(item, index, selected)
   if owns_focus then
     vim.cmd.stopinsert()
   end
+  for _, win in ipairs(self.separator_wins or {}) do
+    if api.nvim_win_is_valid(win) then
+      api.nvim_win_close(win, true)
+    end
+  end
   for _, field in ipairs({ "input_win", "list_win", "preview_win", "frame_win" }) do
     local win = self[field]
     if win and api.nvim_win_is_valid(win) then
       api.nvim_win_close(win, true)
     end
   end
-  for _, field in ipairs({ "input_buf", "list_buf", "preview_buf", "frame_buf" }) do
+  for _, field in ipairs({ "input_buf", "list_buf", "preview_buf", "frame_buf", "separator_buf" }) do
     local buf = self[field]
     if buf and api.nvim_buf_is_valid(buf) then
       api.nvim_buf_delete(buf, { force = true })
@@ -473,6 +528,8 @@ function Picker:_events()
         vim.wo[self.preview_win].list = false
         vim.wo[self.preview_win].foldenable = false
         vim.wo[self.preview_win].scrolloff = 0
+        vim.wo[self.preview_win].number = true
+        vim.wo[self.preview_win].relativenumber = false
         vim.wo[self.preview_win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
       end
       for _, name in ipairs({ "frame", "input", "list", "preview" }) do
@@ -588,11 +645,16 @@ function Picker:_mount(resolved)
       vim.wo[win].sidescrolloff = 0
       vim.wo[win].list = false
       vim.wo[win].foldenable = false
+      if name == "preview" then
+        vim.wo[win].number = true
+        vim.wo[win].relativenumber = false
+      end
     end
   end
   api.nvim_set_hl(0, "SelectionToolsBorder", { default = true, link = "FloatBorder" })
   api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
   api.nvim_set_hl(0, "SelectionToolsMatch", { default = true, link = "Search" })
+  api.nvim_set_hl(0, "SelectionToolsCount", { default = true, link = "Comment" })
   self:_events()
   active = self
   self:_filter()

@@ -90,6 +90,11 @@ with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
 cancels the old one. Leaving the picker windows cancels it. External window
 closure and input buffer destruction also clean up the picker.
 
+The match/total count appears at the right of the input row, with space reserved
+for it even when the query scrolls horizontally. Internal dividers join the
+outer border and do not display preview filenames. Previews use absolute line
+numbers.
+
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
 Live grep is not included.
