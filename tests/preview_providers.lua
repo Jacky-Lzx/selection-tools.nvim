@@ -232,6 +232,64 @@ test("a paint callback may close its owner without touching dead panes", functio
   end))
   assert(p.closed)
 end)
+test("retained provider frames remain until the next guarded paint or cancellation", function()
+  local pending, old, closed
+  closed = 0
+  local retained = {
+    close = function()
+      closed = closed + 1
+    end,
+  }
+  retained.retain = function(self)
+    return self
+  end
+  local p = open({
+    function(ctx)
+      if ctx.path == png then
+        old = ctx
+        ctx.paint(function(buf)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "retained grid" })
+        end)
+        return retained
+      end
+      pending = ctx
+      return true
+    end,
+  })
+  p:move(1)
+  eq(closed, 0)
+  eq(pending.previous, retained)
+  assert(pending.has_preview)
+  eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1], "retained grid")
+  assert(not old.paint(function()
+    error("stale frame repainted")
+  end))
+  pending.paint(function(buf)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "ready replacement" })
+  end)
+  eq(closed, 1)
+  eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1], "ready replacement")
+  p:close()
+  eq(closed, 1)
+  closed = 0
+  p = open({
+    function(ctx)
+      if ctx.path == png then
+        ctx.paint(function(buf)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "retained grid" })
+        end)
+        return retained
+      end
+      return true
+    end,
+  })
+  p:move(1)
+  eq(closed, 0)
+  p:set_query("no such entry")
+  eq(closed, 1)
+  p:close()
+  eq(closed, 1)
+end)
 vim.fn.delete(fixture, "rf")
 print(("%d preview provider tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

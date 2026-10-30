@@ -176,6 +176,8 @@ uses default provider settings.
 Only image candidates load image-tools. Text and dirty buffers keep file preview.
 provider({page=2,upscale=false}) supplies render options. Image-tools owns media,
 cache and terminal placements; the picker owns windows, focus and lifetime.
+Image switches retain the last ready frame/lease until its replacement is
+acknowledged and painted; skipped requests cancel without blanking that frame.
 No Snacks.image or built-in image renderer is involved. Terminal/preparation
 errors appear in the preview. Extension preflight can be overridden with an
 extensions map; image-tools remains the final format authority.
@@ -187,7 +189,10 @@ handles the item. preview_item and source-specific previewer take precedence.
 paint invokes draw(buf,win) with writable flags restored afterward; lines and
 extmarks are one guarded transaction. Main-thread calls are synchronous; fast
 callbacks schedule the whole transaction. Stale requests do not draw. resize()
-notifies the handle after layout changes; change/close releases its own handle.
+notifies the handle after layout changes. Optional retain() returns a frozen
+ready display handle on change; ctx.previous passes it to the next provider,
+and ctx.has_preview indicates existing content. The next paint/set_lines or
+cancellation releases the retained handle. Other providers close immediately.
 
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
 injections and multiline strings. Loaded buffers are read without modification;

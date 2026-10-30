@@ -128,7 +128,7 @@ require("selection_tools").setup({
 
 在 lazy.nvim 尚未加载插件的 `opts` 表中，可使用延迟回调：`providers = { function(ctx) return require("selection_tools.integrations.image_tools").preview(ctx) end }`。
 
-适配器仅在遇到 PNG、SVG、PDF 等候选时加载 image-tools，普通文本沿用原预览，已加载的未保存文本优先。图片保留比例适配预览区；切换/关闭会释放本次视图，`F3` 及窗口缩放会更新已有视图并复用像素缓存。需要包含嵌入式 API 的 image-tools 版本和其支持的终端图像能力，错误会显示在预览区。联动默认不启用，也不改变 `vim.ui.select` 的预览优先级。
+适配器仅在遇到 PNG、SVG、PDF 等候选时加载 image-tools，普通文本沿用原预览，已加载的未保存文本优先。图片保留比例适配预览区；切换图片时保留上一张已就绪的图像，等新图片放置确认并绘制后再释放旧视图，避免 Loading/空白闪烁；快速跳过的请求仍会取消。关闭会释放本次及保留视图，`F3` 及窗口缩放会更新已有视图并复用像素缓存。需要包含嵌入式 API 的 image-tools 版本和其支持的终端图像能力，错误会显示在预览区。联动默认不启用，也不改变 `vim.ui.select` 的预览优先级。
 
 `provider({ page = 2, upscale = false })` 可指定 PDF 页码及放大策略。`extensions` 可提供额外的扩展名映射（如 `{ png=true, pdf=true }`）作为按需加载的前置筛选；最终格式能力仍由 image-tools 判断。
 
@@ -136,7 +136,7 @@ require("selection_tools").setup({
 
 `preview.providers` 按顺序调用 `function(ctx)`；返回 `false` / `nil` 表示交给下一个 provider 或默认文件预览。返回 `true`、取消函数，或带 `close()` / 可选 `resize()` 的对象表示接管。调用者提供的 `preview_item` 和搜索源自带的 `previewer` 保留优先级。
 
-`ctx` 包含 `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`。`ctx.paint(draw, { title = ... })` 在一次受有效期检查的主线程事务中调用 `draw(buf,win)`，支持同步写行和添加 extmark，自动恢复 buffer 的可写标志。主线程调用同步完成；fast callback 调用会整体调度，过期工作被丢弃。图像占位符应通过 `paint` 绘制，避免在异步 `set_lines` 后立即添加高亮。缩放调用返回对象的 `resize()`，换项/关闭调用取消函数或 `close()`。
+`ctx` 包含 `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`。`ctx.paint(draw, { title = ... })` 在一次受有效期检查的主线程事务中调用 `draw(buf,win)`，支持同步写行和添加 extmark，自动恢复 buffer 的可写标志。主线程调用同步完成；fast callback 调用会整体调度，过期工作被丢弃。图像占位符应通过 `paint` 绘制，避免在异步 `set_lines` 后立即添加高亮。缩放调用返回对象的 `resize()`。换项时若对象提供 `retain()`，可返回一个只保留已就绪显示的句柄，通过下次 `ctx.previous` 传递；`ctx.has_preview` 表示已有内容。新 `paint` / `set_lines` 完成后或取消时关闭保留句柄；不支持保留的 provider 仍立即调用取消函数或 `close()`。
 
 ## 流式全文搜索
 

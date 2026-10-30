@@ -18,12 +18,39 @@ function Preview:resize()
   end
 end
 
-function Preview:cancel()
+-- Retired providers can keep a ready frame while the next item prepares.
+function Preview:_release_retained(redraw)
+  local retained = self.retained
+  self.retained = nil
+  if retained and type(retained.close) == "function" then
+    if redraw and not self.picker.closed and not retained.closed then
+      vim.cmd.redraw()
+    end
+    pcall(retained.close, retained)
+  end
+end
+
+function Preview:cancel(preserve)
   self.generation = self.generation + 1
-  self.provider = nil
-  if self.cancel_provider then
-    pcall(self.cancel_provider)
-    self.cancel_provider = nil
+  local provider, cancel = self.provider, self.cancel_provider
+  self.provider, self.cancel_provider = nil, nil
+  if preserve and type(provider) == "table" and type(provider.retain) == "function" then
+    local ok, retained = pcall(provider.retain, provider)
+    if ok and type(retained) == "table" and type(retained.close) == "function" then
+      if self.retained ~= retained then
+        self:_release_retained(false)
+      end
+      self.retained, cancel = retained, nil
+    end
+  end
+  if cancel then
+    pcall(cancel)
+  end
+  if not preserve then
+    self:_release_retained(false)
+  end
+  if self.retained and self.retained.closed then
+    self.retained = nil
   end
 end
 
@@ -109,6 +136,7 @@ function Preview:write(lines, ft, title, pos)
   self.displayed_item = self.item
   self.picker:_restore_preview()
   self.picker:_draw_frame()
+  self:_release_retained(false)
 end
 
 function Preview:update(item, index)
@@ -117,7 +145,7 @@ function Preview:update(item, index)
   if self.initialized and self.item == item and self.index == index and self.tick == tick then
     return
   end
-  self:cancel()
+  self:cancel(index ~= nil)
   self.initialized, self.item, self.index, self.tick = true, item, index, tick
   local generation = self.generation
   local function current()
@@ -136,6 +164,7 @@ function Preview:update(item, index)
   end
   local opts = self.picker.opts
   if opts.preview_item then
+    self:_release_retained(false)
     local ok, result = pcall(opts.preview_item, item)
     if not ok then
       self:write({ "Preview error: " .. tostring(result):gsub("[\r\n]", " ") })
@@ -174,6 +203,8 @@ function Preview:update(item, index)
   local ctx = {
     item = item,
     index = index,
+    previous = self.retained,
+    has_preview = self.displayed and self.displayed_item ~= nil,
     path = path,
     source_buf = buf,
     buf = self.buf,
@@ -223,6 +254,7 @@ function Preview:update(item, index)
         vim.fn.winrestview({ topline = 1, leftcol = 0 })
       end)
       self.picker:_draw_frame()
+      self:_release_retained(true)
       return true
     end
     if vim.in_fast_event() then

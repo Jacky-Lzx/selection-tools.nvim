@@ -38,17 +38,20 @@ function M.provider(opts)
     if not image.supports(path) then
       return false
     end
-    -- Synchronous preparation precedes renderer ownership; no queued Loading write
-    -- may run after image-tools has painted its first placeholder grid.
-    if
-      not ctx.paint(function(buf)
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Loading image…" })
-      end, { title = vim.fs.basename(path) })
-    then
-      return true
+    -- Only the first empty pane needs a loading message. A retained view owns
+    -- its visible grid/lease until the replacement's acknowledged draw.
+    if not ctx.previous and not ctx.has_preview then
+      if
+        not ctx.paint(function(buf)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Loading image…" })
+        end, { title = vim.fs.basename(path) })
+      then
+        return true
+      end
     end
     local view, err = image.render({
       path = path,
+      previous = ctx.previous,
       buf = ctx.buf,
       win = ctx.win,
       page = opts.page,

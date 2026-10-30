@@ -41,6 +41,7 @@ local p = require("selection_tools").open({
   layout = { width = 0.95, height = 0.9 },
 })
 local phase, ticks, view, id, uploads = "start", 0, nil, nil, nil
+local retained, retained_grid, retained_color, retained_samples = nil, nil, nil, 0
 local timer = assert(vim.uv.new_timer())
 local function mark(value)
   vim.fn.writefile({ value }, directory .. "/stage")
@@ -95,24 +96,60 @@ timer:start(
         phase = "warm"
       elseif phase == "warm" and p.preview.provider and p.preview.provider.id then
         assert(require("image_tools").status().terminal_cache.uploads == uploads)
+        retained = p.preview.provider
+        retained_grid = vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false)
+        vim.cmd.redraw()
+        local top, left = unpack(vim.api.nvim_win_get_position(p.preview_win))
+        retained_color = vim.fn.screenattr(top + 1, left + 1)
+        local media = require("image_tools.media")
+        local prepare = media.prepare
+        media.prepare = function(path, opts, callback)
+          if not path:match("%.pdf$") then
+            return prepare(path, opts, callback)
+          end
+          local cancelled, release = false, nil
+          local delay = vim.defer_fn(function()
+            if not cancelled then
+              release = prepare(path, opts, callback)
+            end
+          end, 300)
+          return function()
+            cancelled = true
+            if not delay:is_closing() then
+              delay:stop()
+              delay:close()
+            end
+            if release then
+              release()
+            end
+          end
+        end
         mark("pdf")
         phase = "pdf"
-      elseif
-        phase == "pdf"
-        and p.preview.provider
-        and p.preview.provider.path:match("%.pdf$")
-        and p.preview.provider.id
-      then
-        assert(vim.api.nvim_get_current_win() == p.input_win and vim.api.nvim_get_mode().mode == "i")
-        view = p.preview.provider
-        mark("cancel")
-        phase = "closed"
+      elseif phase == "pdf" and p.preview.provider and p.preview.provider.path:match("%.pdf$") then
+        if not p.preview.provider.id then
+          assert(not retained.closed, "Switch closed the old image before replacement")
+          assert(
+            vim.deep_equal(vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false), retained_grid),
+            "Loading/blank frame replaced old pixels"
+          )
+          vim.cmd.redraw()
+          local top, left = unpack(vim.api.nvim_win_get_position(p.preview_win))
+          assert(vim.fn.screenattr(top + 1, left + 1) == retained_color, "Old image screen colors were cleared")
+          retained_samples = retained_samples + 1
+        else
+          assert(retained_samples >= 5 and retained.closed, "Delayed handoff did not retain then retire the old view")
+          assert(vim.api.nvim_get_current_win() == p.input_win and vim.api.nvim_get_mode().mode == "i")
+          view = p.preview.provider
+          mark("cancel")
+          phase = "closed"
+        end
       elseif phase == "closed" and p.closed then
         assert(view.closed and require("image_tools").status().terminal_cache.placements == 0)
         assert(not package.loaded.snacks and not package.loaded["snacks.image"])
         finish(
           true,
-          "PASS terminal image-tools API: lazy PNG/PDF rendering in existing pane, visible acknowledged placeholders, F3 cached resize, filter/text fallback, warm reopen, focus and lease cleanup (pixel display simulated)"
+          "PASS terminal image-tools API: lazy PNG/PDF rendering in existing pane, visible acknowledged placeholders, F3 cached resize, filter/text fallback, warm reopen, no Loading/blank frames during delayed PDF handoff, focus and lease cleanup (pixel display simulated)"
         )
       end
     end, debug.traceback)
