@@ -5,6 +5,7 @@ return function(opts)
     prompt = "Grep",
     cwd = vim.fn.fnamemodify(opts.cwd or vim.fn.getcwd(), ":p"),
     live = true,
+    search_options = true,
     match = false,
     result_layout = "grep",
     syntax = { enabled = true },
@@ -20,7 +21,7 @@ return function(opts)
         ctx.done()
         return
       end
-      return util.rg(opts, ctx, ctx.query)
+      return util.rg(ctx.opts, ctx, ctx.query)
     end,
     on_choice = util.jump,
   }

@@ -39,6 +39,12 @@ local defaults = {
     previous = { "<C-p>", "<Up>" },
     quickfix = { "<C-q>" },
     loclist = { "<C-l>" },
+    search_regex = { "<A-r>" },
+    search_case = { "<A-c>" },
+    search_hidden = { "<A-h>" },
+    search_ignored = { "<A-i>" },
+    search_scope = { "<A-f>" },
+    search_globs = { "<A-g>" },
   },
 }
 

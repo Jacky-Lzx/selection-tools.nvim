@@ -129,6 +129,13 @@ UTF-8 characters. Narrow layouts omit icons/line positions, then hide the file
 column entirely. Syntax/query ranges follow clipped code; original item data,
 copied paths and navigation remain intact. result_layout="plain" restores the
 file-first layout.
+Search controls (files/grep): ALT-H hidden, ALT-I ignored, ALT-F directory,
+ALT-G comma-separated file globs (! excludes). Grep also supports ALT-R regex
+and ALT-C case (smart/sensitive/ignore). Flags appear in the title. Changes
+cancel/restart the finder without changing the input and are retained by resume.
+File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
+globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).
+
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
 injections and multiline strings. Loaded buffers are read without modification;
 other files load asynchronously. Queries use the current runtime's highlights.

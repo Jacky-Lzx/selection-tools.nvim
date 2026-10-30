@@ -188,7 +188,15 @@ function M.rg(opts, ctx, pattern, transform)
       ctx.fail("search requires ripgrep (rg)")
       return
     end
-    local cmd = { opts.command or "rg", "--json", "--smart-case", "--color", "never", "--glob", "!.git/**" }
+    local cmd = {
+      opts.command or "rg",
+      "--json",
+      ({ smart = "--smart-case", sensitive = "--case-sensitive", ignore = "--ignore-case" })[opts.case or "smart"],
+      "--color",
+      "never",
+      "--glob",
+      "!.git/**",
+    }
     if opts.regex ~= true then
       cmd[#cmd + 1] = "--fixed-strings"
     end
@@ -197,6 +205,9 @@ function M.rg(opts, ctx, pattern, transform)
     end
     if opts.ignored then
       cmd[#cmd + 1] = "--no-ignore"
+    end
+    for _, glob in ipairs(opts.globs or {}) do
+      vim.list_extend(cmd, { "--glob", glob })
     end
     vim.list_extend(cmd, { "-e", pattern, "--", "." })
     local ok, spawned = pcall(vim.system, cmd, { cwd = ctx.cwd }, function(result)

@@ -3,14 +3,16 @@ return function(opts)
   return {
     prompt = "Files",
     multi = true,
+    search_options = true,
     preview = { enabled = true },
     cwd = cwd,
     format_item = function(item)
       return item.text
     end,
     finder = function(ctx)
+      local opts, cwd = ctx.opts, ctx.cwd
       local cmd
-      if vim.fn.executable("fd") == 1 then
+      if vim.fn.executable("fd") == 1 and #(opts.globs or {}) == 0 then
         cmd = { "fd", "--type", "f", "--color", "never", "--print0", "--exclude", ".git" }
         if opts.hidden then
           cmd[#cmd + 1] = "--hidden"
@@ -29,6 +31,9 @@ return function(opts)
       else
         ctx.fail("file search requires fd or ripgrep (rg)")
         return
+      end
+      for _, glob in ipairs(opts.globs or {}) do
+        vim.list_extend(cmd, { "--glob", glob })
       end
       local process = vim.system(cmd, { cwd = cwd }, function(result)
         if ctx.is_cancelled() then

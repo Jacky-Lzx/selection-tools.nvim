@@ -33,6 +33,11 @@ function Picker:_draw_frame()
   if not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
     return
   end
+  if self.opts.search_options then
+    local title = single_line(self.opts.prompt or "Select")
+      .. require("selection_tools.search_options").label(self.opts)
+    api.nvim_win_set_config(self.frame_win, { title = " " .. single_line(title) .. " " })
+  end
   local lines = {}
   for i = 1, self.resolved.total_height do
     lines[i] = ""
@@ -446,6 +451,7 @@ function Picker:_find()
   local ctx = {
     query = self.query,
     cwd = self.opts.cwd or vim.fn.getcwd(),
+    opts = self.opts,
     is_cancelled = function()
       return not current()
     end,
@@ -499,6 +505,10 @@ function Picker:set_items(items)
 end
 
 ---Update the search input. Live sources restart; static sources filter locally.
+function Picker:set_search_options(changes)
+  return require("selection_tools.search_options").set(self, changes)
+end
+
 function Picker:set_query(query)
   if self.closed then
     return
@@ -761,7 +771,13 @@ function Picker:_events()
     callback = function()
       vim.schedule(function()
         local win = api.nvim_get_current_win()
-        if not self.closed and win ~= self.input_win and win ~= self.list_win and win ~= self.preview_win then
+        if
+          not self.closed
+          and not self.prompting
+          and win ~= self.input_win
+          and win ~= self.list_win
+          and win ~= self.preview_win
+        then
           self:close()
         end
       end)
@@ -859,6 +875,11 @@ function Picker:_events()
   for _, name in ipairs({ "quickfix", "quickfix_all", "loclist", "loclist_all" }) do
     actions[name] = function()
       require("selection_tools.actions").export(self, name:match("^loclist") ~= nil, name:match("_all$") ~= nil)
+    end
+  end
+  for _, name in ipairs({ "regex", "case", "hidden", "ignored", "scope", "globs" }) do
+    actions["search_" .. name] = function()
+      require("selection_tools.search_options").action(self, name)
     end
   end
   actions.ignore = function() end

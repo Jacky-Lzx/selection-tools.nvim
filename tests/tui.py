@@ -35,6 +35,9 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "workflows_tui":
+            actions.update(regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
+                           scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11")
         if case == "grep_columns_tui":
             actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
         if case == "grep_tui":
@@ -93,6 +96,7 @@ if __name__ == "__main__":
     run_case("match_tui")
     run_case("grep_tui")
     run_case("grep_columns_tui")
+    run_case("workflows_tui")
     run_case("syntax_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
