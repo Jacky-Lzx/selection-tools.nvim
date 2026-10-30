@@ -235,3 +235,5 @@ python3 tests/tui.py
 - `qflist()`：选择 Quickfix 条目，预览文件并保留原生列表索引；列表变化后拒绝使用过期位置。
 
 - `loclist()`：从调用窗口读取 Location list，并在该窗口跳转；不会读取 picker 窗口的列表。
+
+- `commands()`：搜索内置、全局和当前缓冲区命令；默认填入命令行以便补充参数，execute=true 可直接执行。

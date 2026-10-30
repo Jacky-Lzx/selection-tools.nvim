@@ -14,6 +14,7 @@ local M = {
     "command_history",
     "qflist",
     "loclist",
+    "commands",
   },
 }
 

@@ -316,6 +316,26 @@ test("location list belongs to the invoking window and rejects changed lists", f
   eq(vim.api.nvim_win_get_cursor(0), { 1, 2 })
 end)
 
+test("commands include builtins and prefer buffer-local definitions", function()
+  vim.api.nvim_create_user_command("SelectionFeatureCommand", function()
+    vim.g.selection_command_test = "global"
+  end, {})
+  vim.api.nvim_buf_create_user_command(0, "SelectionFeatureCommand", function()
+    vim.g.selection_command_test = "buffer"
+  end, {})
+  local p = tools.commands({ query = "SelectionFeatureCommand", execute = true })
+  eq(#p.matches, 1)
+  assert(p:current().text:find("buffer", 1, true))
+  p:confirm()
+  eq(vim.g.selection_command_test, "buffer")
+  p = tools.commands({ query = "edit" })
+  assert(#p.matches > 0)
+  p:close()
+  vim.api.nvim_buf_del_user_command(0, "SelectionFeatureCommand")
+  vim.api.nvim_del_user_command("SelectionFeatureCommand")
+  vim.g.selection_command_test = nil
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
