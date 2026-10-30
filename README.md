@@ -237,3 +237,5 @@ python3 tests/tui.py
 - `loclist()`：从调用窗口读取 Location list，并在该窗口跳转；不会读取 picker 窗口的列表。
 
 - `commands()`：搜索内置、全局和当前缓冲区命令；默认填入命令行以便补充参数，execute=true 可直接执行。
+
+- `autocmds()`：搜索事件、分组、pattern 和说明，预览完整定义；确认后定位 Lua 定义或打开只读详情。

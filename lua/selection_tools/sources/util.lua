@@ -71,6 +71,32 @@ function M.preview(ctx)
   )
 end
 
+function M.definition(callback, sid, lnum)
+  if type(callback) == "function" then
+    local info = debug.getinfo(callback, "S")
+    if info and info.source:sub(1, 1) == "@" then
+      return { file = info.source:sub(2), pos = { math.max(1, info.linedefined), 0 } }
+    end
+  end
+  if sid and sid > 0 then
+    for _, script in ipairs(vim.fn.getscriptinfo()) do
+      if script.sid == sid and script.name ~= "" then
+        return { file = script.name, pos = { math.max(1, lnum or 1), 0 } }
+      end
+    end
+  end
+end
+
+function M.show(item)
+  vim.cmd("botright new")
+  local buf = api.nvim_get_current_buf()
+  vim.bo[buf].buftype, vim.bo[buf].bufhidden, vim.bo[buf].swapfile = "nofile", "wipe", false
+  vim.bo[buf].buflisted = false
+  api.nvim_buf_set_lines(buf, 0, -1, false, item.lines or vim.split(item.detail or item.text, "\n", { plain = true }))
+  vim.bo[buf].filetype = item.ft or "text"
+  vim.bo[buf].modified, vim.bo[buf].modifiable = false, false
+end
+
 function M.rg(opts, ctx, pattern, transform)
   local process, timer
   local function start()

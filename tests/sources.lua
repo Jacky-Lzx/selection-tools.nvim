@@ -336,6 +336,25 @@ test("commands include builtins and prefer buffer-local definitions", function()
   vim.g.selection_command_test = nil
 end)
 
+test("autocommands show metadata without executing the event", function()
+  local group = vim.api.nvim_create_augroup("SelectionSourceTest", { clear = true })
+  local calls = 0
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "SelectionNoRun",
+    desc = "selection_autocmd_test",
+    callback = function()
+      calls = calls + 1
+    end,
+  })
+  local p = tools.autocmds({ query = "selection_autocmd_test" })
+  eq(#p.matches, 1)
+  assert(p:current().detail:find("SelectionNoRun", 1, true))
+  p:close()
+  eq(calls, 0)
+  vim.api.nvim_del_augroup_by_id(group)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

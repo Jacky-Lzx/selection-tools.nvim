@@ -15,6 +15,7 @@ local M = {
     "qflist",
     "loclist",
     "commands",
+    "autocmds",
   },
 }
 
