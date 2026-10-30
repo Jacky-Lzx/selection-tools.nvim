@@ -12,6 +12,7 @@ local M = {
     "undo",
     "search_history",
     "command_history",
+    "qflist",
   },
 }
 

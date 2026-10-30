@@ -280,6 +280,25 @@ test("command history runs the confirmed command in the original window", functi
   vim.g.selection_history_test = nil
 end)
 
+test("quickfix selection previews and updates the native list index", function()
+  vim.fn.writefile({ "first", "second" }, fixture .. "/quickfix.txt")
+  vim.fn.setqflist(
+    {},
+    " ",
+    {
+      title = "test",
+      items = {
+        { filename = fixture .. "/quickfix.txt", lnum = 1, col = 1, text = "one" },
+        { filename = fixture .. "/quickfix.txt", lnum = 2, col = 2, text = "two" },
+      },
+    }
+  )
+  local p = tools.qflist({ query = "two" })
+  p:confirm()
+  eq(vim.fn.getqflist({ idx = 0 }).idx, 2)
+  eq(vim.api.nvim_win_get_cursor(0), { 2, 1 })
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
