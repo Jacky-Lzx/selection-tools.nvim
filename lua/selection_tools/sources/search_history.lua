@@ -4,7 +4,7 @@ return function()
   for i = vim.fn.histnr("/"), 1, -1 do
     local pattern = vim.fn.histget("/", i)
     if pattern ~= "" then
-      items[#items + 1] = { pattern = pattern, text = pattern }
+      items[#items + 1] = { key = pattern, pattern = pattern, text = pattern }
     end
   end
   return {

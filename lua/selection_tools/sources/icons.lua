@@ -52,6 +52,7 @@ return function(opts)
           if key and not seen[key] then
             seen[key] = true
             items[#items + 1] = {
+              key = key,
               icon = glyph,
               name = name,
               text = table.concat({ glyph, icon.source or source, category, name }, "  "),
@@ -104,7 +105,11 @@ return function(opts)
       end
       for name, source in pairs(sources) do
         local remote = source.url:match("^https?://")
-        local path = remote and vim.fs.joinpath(cache, name .. "-" .. vim.fn.sha256(source.url):sub(1, 8) .. ".json")
+        local path = remote
+            and vim.fs.joinpath(
+              cache,
+              name:gsub("[^%w_-]", "_") .. "-" .. vim.fn.sha256(source.url):sub(1, 8) .. ".json"
+            )
           or source.url
         local function decode(text, save)
           local ok, data = pcall(vim.json.decode, text)
@@ -129,7 +134,8 @@ return function(opts)
         if ok then
           decode(table.concat(lines, "\n"))
         elseif remote and vim.fn.executable("curl") == 1 then
-          local job = vim.system(
+          local started, job = pcall(
+            vim.system,
             { "curl", "--fail", "--silent", "--show-error", "--location", "--max-time", "20", source.url },
             { text = true },
             function(result)
@@ -149,7 +155,12 @@ return function(opts)
               end)
             end
           )
-          jobs[#jobs + 1] = job
+          if started then
+            jobs[#jobs + 1] = job
+          else
+            vim.notify("selection-tools: cannot fetch " .. name .. " icons: " .. tostring(job), vim.log.levels.WARN)
+            finish()
+          end
         else
           vim.notify("selection-tools: cannot read icon catalog " .. name, vim.log.levels.WARN)
           finish()

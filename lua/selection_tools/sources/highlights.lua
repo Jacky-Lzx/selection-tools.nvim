@@ -6,7 +6,8 @@ return function()
     local hl = vim.api.nvim_get_hl(0, { name = name, link = true, create = false })
     items[#items + 1] = {
       name = name,
-      text = name .. (hl.link and (" → " .. hl.link) or ""),
+      key = name,
+      text = name,
       lines = vim.split(
         table.concat({
           "Sample: AaBbCc 0123456789 !@#$%",

@@ -13,6 +13,7 @@ return function(opts)
       local ok, lines = pcall(vim.fn.getreg, name, 1, true)
       if ok and table.concat(lines, "\n") ~= "" then
         items[#items + 1] = {
+          key = name,
           name = name,
           lines = lines,
           value = table.concat(lines, "\n"),

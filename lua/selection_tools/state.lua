@@ -3,6 +3,9 @@ local last
 
 function M.key(entry)
   local item = entry.item
+  if type(item) == "table" and item.key ~= nil then
+    return "key:" .. tostring(item.key)
+  end
   if type(item) == "table" and (item.file or item.bufnr) then
     local pos = item.pos or {}
     return tostring(item.file or item.bufnr) .. "\0" .. tostring(pos[1] or 0) .. ":" .. tostring(pos[2] or 0)

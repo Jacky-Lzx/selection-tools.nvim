@@ -2,7 +2,7 @@ local util = require("selection_tools.sources.util")
 local function plain(text)
   text = text:gsub("\27%[[%d;]*[A-Za-z]", "")
   while text:find("\b", 1, true) do
-    local replaced, count = text:gsub("[^\b]\b", "")
+    local replaced, count = text:gsub("[^\128-\191\b][\128-\191]*\b", "")
     text = replaced
     if count == 0 then
       return text:gsub("\b", "")
@@ -73,7 +73,7 @@ return function(opts)
         },
       }, function(result)
         if result.code ~= 0 then
-          ctx.set_lines({ "Cannot render man page", result.stderr or "" })
+          ctx.set_lines(vim.split("Cannot render man page\n" .. (result.stderr or ""), "\n", { plain = true }))
           return
         end
         ctx.set_lines(vim.split(plain(result.stdout or ""), "\n", { plain = true }), "man", ctx.item.text)

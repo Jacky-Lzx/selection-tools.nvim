@@ -4,7 +4,7 @@ return function()
   for i = vim.fn.histnr(":"), 1, -1 do
     local command = vim.fn.histget(":", i)
     if command ~= "" then
-      items[#items + 1] = { command = command, text = command, ft = "vim" }
+      items[#items + 1] = { key = command, command = command, text = command, ft = "vim" }
     end
   end
   return {

@@ -119,7 +119,7 @@ function M.rg(opts, ctx, pattern, transform)
       cmd[#cmd + 1] = "--no-ignore"
     end
     vim.list_extend(cmd, { "-e", pattern, "--", "." })
-    process = vim.system(cmd, { cwd = ctx.cwd }, function(result)
+    local ok, spawned = pcall(vim.system, cmd, { cwd = ctx.cwd }, function(result)
       vim.schedule(function()
         if ctx.is_cancelled() then
           return
@@ -172,6 +172,11 @@ function M.rg(opts, ctx, pattern, transform)
         decode()
       end)
     end)
+    if ok then
+      process = spawned
+    else
+      ctx.fail(tostring(spawned))
+    end
   end
   if (opts.debounce_ms or 30) > 0 then
     timer = vim.defer_fn(start, opts.debounce_ms or 30)

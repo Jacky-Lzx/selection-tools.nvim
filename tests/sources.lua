@@ -464,6 +464,89 @@ test("icons insert the selected glyph and support local custom catalogs offline"
   p:close()
 end)
 
+test("delayed grep reports spawn failures instead of remaining busy", function()
+  local p = tools.grep({ cwd = fixture .. "/missing", query = "test", debounce_ms = 1 })
+  assert(vim.wait(2000, function()
+    return not p.loading
+  end, 2))
+  assert(p.error)
+  p:close()
+end)
+
+test("refreshed search history resumes by pattern after new entries are added", function()
+  vim.fn.histadd("/", "selection_resume_old")
+  local p = tools.search_history({ query = "selection_resume_old" })
+  p:close()
+  vim.fn.histadd("/", "selection_resume_new")
+  p = tools.resume()
+  ready(p)
+  eq(p:current().pattern, "selection_resume_old")
+  p:close()
+end)
+
+test("icon downloads finish asynchronously, cache catalogs and cancel stale work", function()
+  local system, stdpath = vim.system, vim.fn.stdpath
+  local callback, killed
+  vim.fn.stdpath = function(kind)
+    return kind == "cache" and (fixture .. "/cache") or stdpath(kind)
+  end
+  vim.system = function(_, _, done)
+    callback = done
+    return {
+      kill = function()
+        killed = true
+      end,
+    }
+  end
+  local ok, err = xpcall(function()
+    local p = tools.icons({
+      icon_sources = {},
+      devicons = false,
+      custom_sources = { test = "https://example.invalid/test.json" },
+    })
+    assert(p.loading)
+    callback({ code = 0, stdout = vim.json.encode({ { icon = "🦀", name = "downloaded crab" } }) })
+    ready(p)
+    p:set_query("downloaded crab")
+    eq(p:current().icon, "🦀")
+    p:close()
+    assert(killed)
+    p = tools.icons({
+      icon_sources = {},
+      devicons = false,
+      custom_sources = { test = "https://example.invalid/test.json" },
+      query = "downloaded crab",
+    })
+    ready(p)
+    eq(p:current().icon, "🦀")
+    p:close()
+    p = tools.icons({
+      icon_sources = {},
+      devicons = false,
+      custom_sources = { cancelled = "https://example.invalid/cancel.json" },
+    })
+    p:close()
+    callback({ code = 0, stdout = "[]" })
+    vim.wait(10, function()
+      return false
+    end, 1)
+    eq(#vim.fn.glob(fixture .. "/cache/selection-tools/icons/*", false, true), 1)
+    vim.system = function()
+      error("spawn failed")
+    end
+    p = tools.icons({
+      icon_sources = {},
+      devicons = false,
+      custom_sources = { failed = "https://example.invalid/fail.json" },
+    })
+    ready(p)
+    assert(#p.matches > 0)
+    p:close()
+  end, debug.traceback)
+  vim.system, vim.fn.stdpath = system, stdpath
+  assert(ok, err)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

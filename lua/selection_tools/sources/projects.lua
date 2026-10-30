@@ -50,6 +50,7 @@ return function(opts)
   end
   return {
     prompt = "Projects",
+    resume_refresh = true,
     items = items,
     format_item = util.format,
     preview = { enabled = true },

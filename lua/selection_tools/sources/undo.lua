@@ -9,6 +9,7 @@ return function()
       if not seen[entry.seq] then
         seen[entry.seq] = true
         items[#items + 1] = {
+          key = entry.seq,
           seq = entry.seq,
           text = ("seq %d%s  %s"):format(
             entry.seq,
@@ -22,7 +23,7 @@ return function()
   end
   collect(tree.entries)
   if seen[1] then
-    items[#items + 1] = { seq = 0, text = "seq 0  initial state" }
+    items[#items + 1] = { key = 0, seq = 0, text = "seq 0  initial state" }
   end
   table.sort(items, function(a, b)
     return a.seq > b.seq
