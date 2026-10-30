@@ -20,6 +20,7 @@ local M = {
     "help",
     "man",
     "spelling",
+    "highlights",
   },
 }
 

@@ -433,6 +433,20 @@ test("spelling replaces only the selected Unicode word and rejects stale edits",
   vim.bo.modified = false
 end)
 
+test("highlights preview resolved attributes and apply the actual highlight group", function()
+  vim.api.nvim_set_hl(0, "SelectionSourceHighlight", { fg = "#123456", bold = true })
+  local p = tools.highlights({ query = "SelectionSourceHighlight" })
+  eq(#p.matches, 1)
+  local ns = vim.api.nvim_get_namespaces().selection_tools_highlights
+  assert(vim.wait(1000, function()
+    return #vim.api.nvim_buf_get_extmarks(p.preview_buf, ns, 0, -1, {}) == 1
+  end, 2))
+  local marks = vim.api.nvim_buf_get_extmarks(p.preview_buf, ns, 0, -1, { details = true })
+  eq(marks[1][4].hl_group, "SelectionSourceHighlight")
+  p:confirm()
+  eq(vim.api.nvim_get_hl(0, { name = "SelectionSourceHighlight" }).fg, 0x123456)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
