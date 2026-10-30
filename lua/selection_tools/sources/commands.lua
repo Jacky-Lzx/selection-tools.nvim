@@ -1,31 +1,43 @@
 local util = require("selection_tools.sources.util")
 return function(opts)
-  local origin, by_name = util.capture(), {}
-  for _, name in ipairs(vim.fn.getcompletion("", "command")) do
-    by_name[name] =
-      { name = name, text = name, detail = ":" .. name .. "\nBuilt-in command; see :help :" .. name, ft = "vim" }
-  end
-  local function add(commands, scope)
-    for name, cmd in pairs(commands) do
-      by_name[name] = {
-        name = name,
-        key = name,
-        text = name .. "  " .. scope .. "  " .. (cmd.definition or ""),
-        ft = "vim",
-        command = cmd,
-        scope = scope,
-      }
-    end
-  end
-  add(vim.api.nvim_get_commands({ builtin = false }), "global")
-  add(vim.api.nvim_buf_get_commands(origin.buf, { builtin = false }), "buffer")
-  local items = vim.tbl_values(by_name)
-  table.sort(items, function(a, b)
-    return a.name < b.name
-  end)
+  local origin = util.capture()
   return {
     prompt = "Commands",
-    items = items,
+    finder = function(ctx)
+      return util.collect(ctx, function(checkpoint)
+        local by_name = {}
+        for _, name in ipairs(vim.fn.getcompletion("", "command")) do
+          by_name[name] = {
+            name = name,
+            key = name,
+            text = name,
+            detail = ":" .. name .. "\nBuilt-in command; see :help :" .. name,
+            ft = "vim",
+          }
+          checkpoint()
+        end
+        local function add(commands, scope)
+          for name, cmd in pairs(commands) do
+            by_name[name] = {
+              name = name,
+              key = name,
+              text = name .. "  " .. scope .. "  " .. (cmd.definition or ""),
+              ft = "vim",
+              command = cmd,
+              scope = scope,
+            }
+            checkpoint()
+          end
+        end
+        add(vim.api.nvim_get_commands({ builtin = false }), "global")
+        add(vim.api.nvim_buf_get_commands(origin.buf, { builtin = false }), "buffer")
+        local items = vim.tbl_values(by_name)
+        table.sort(items, function(a, b)
+          return a.name < b.name
+        end)
+        return items
+      end)
+    end,
     resume_refresh = true,
     format_item = util.format,
     preview = { enabled = true },

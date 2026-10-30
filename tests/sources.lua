@@ -68,6 +68,7 @@ test("projects combine explicit, recent and discovered roots without duplicates"
   local ok, err = pcall(function()
     local p =
       tools.projects({ projects = { fixture .. "/work/one" }, dev = { fixture .. "/work" }, open_files = false })
+    ready(p)
     local count = 0
     for _, entry in ipairs(p.entries) do
       if entry.item.dir == vim.uv.fs_realpath(fixture .. "/work/one") then
@@ -324,11 +325,13 @@ test("commands include builtins and prefer buffer-local definitions", function()
     vim.g.selection_command_test = "buffer"
   end, {})
   local p = tools.commands({ query = "SelectionFeatureCommand", execute = true })
+  ready(p)
   eq(#p.matches, 1)
   assert(p:current().text:find("buffer", 1, true))
   p:confirm()
   eq(vim.g.selection_command_test, "buffer")
   p = tools.commands({ query = "edit" })
+  ready(p)
   assert(#p.matches > 0)
   p:close()
   vim.api.nvim_buf_del_user_command(0, "SelectionFeatureCommand")
@@ -348,6 +351,7 @@ test("autocommands show metadata without executing the event", function()
     end,
   })
   local p = tools.autocmds({ query = "selection_autocmd_test" })
+  ready(p)
   eq(#p.matches, 1)
   assert(p:current().detail:find("SelectionNoRun", 1, true))
   p:close()
@@ -363,6 +367,7 @@ test("keymap search prefers local mappings and replays the confirmed keys", func
     vim.g.selection_map_test = "buffer"
   end, { buffer = 0, desc = "selection_map_test" })
   local p = tools.keymaps({ modes = { "n" }, query = "selection_map_test" })
+  ready(p)
   eq(#p.matches, 1)
   assert(p:current().text:find("buffer", 1, true))
   p:confirm()
@@ -437,6 +442,7 @@ end)
 test("highlights preview resolved attributes and apply the actual highlight group", function()
   vim.api.nvim_set_hl(0, "SelectionSourceHighlight", { fg = "#123456", bold = true })
   local p = tools.highlights({ query = "SelectionSourceHighlight" })
+  ready(p)
   eq(#p.matches, 1)
   local ns = vim.api.nvim_get_namespaces().selection_tools_highlights
   assert(vim.wait(1000, function()

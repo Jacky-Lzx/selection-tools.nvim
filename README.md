@@ -257,3 +257,5 @@ python3 tests/tui.py
 图标目录来自 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) 和 [unicode-emoji-json](https://github.com/muan/unicode-emoji-json)，首次下载需要 curl；失败时仍可使用本地符号和 devicons。`custom_sources = { name = "/path/icons.json" }` 接受 `[{"icon":"λ","name":"lambda","category":"math"}]` 或 `[["λ","lambda"]]`。远程目录缓存位于 `stdpath("cache")/selection-tools/icons/`。
 
 高亮属性、快捷键/自动命令定义和用户命令详情仅在预览当前项时生成；快捷键定义定位在一次 picker 中复用脚本索引，新 picker 会重新读取。
+
+帮助、高亮、快捷键、自动命令、命令和项目搜索会先显示窗口，再分批准备候选；加载期间可继续输入或取消，候选完成后应用当前查询。项目扫描在一次加载内复用已找到及未找到的项目根目录。懒加载测试同时验证启动只注册轻量入口，以及真实终端中加载时的输入、取消、文件句柄清理和缓存复用。

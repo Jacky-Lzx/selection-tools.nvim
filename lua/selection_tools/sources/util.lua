@@ -133,7 +133,7 @@ function M.collect(ctx, produce, done)
   local thread = coroutine.create(function()
     return produce(function()
       units = units + 1
-      if units >= 256 or vim.uv.hrtime() >= deadline then
+      if units >= 2048 or vim.uv.hrtime() >= deadline then
         coroutine.yield()
       end
     end)

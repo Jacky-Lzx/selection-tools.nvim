@@ -267,6 +267,13 @@ Every source has selection.<name>(opts) and selection.pick(name, opts). The
 :SelectionTools command completes their names. Setup options and per-call
 options apply to every source; per-call values override source defaults.
 
+Help, highlights, keymaps, autocmds, commands and projects mount their windows
+before preparing candidates. Preparation yields between batches and stops on
+cancellation. Input entered during loading is used when candidates arrive.
+Highlight attributes and command/mapping/autocmd details are computed only for
+the previewed item. Script lookups share an index within one picker; a new
+picker gets a fresh index.
+
   grep             Live rg search. Empty input skips scanning. Literal smart
                    case by default; regex=true uses regular expressions.
                    cwd, hidden, ignored, limit=10000, debounce_ms=30.

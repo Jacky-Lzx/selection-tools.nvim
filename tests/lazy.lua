@@ -34,6 +34,16 @@ end
 local fixture = vim.fn.tempname()
 vim.fn.mkdir(fixture, "p")
 
+test("setup installs the selection adapter without loading picker or source implementations", function()
+  tools.setup({ ui_select = true })
+  assert(type(vim.ui.select) == "function")
+  for name in pairs(package.loaded) do
+    assert(not name:match("^selection_tools%.sources%."), name)
+  end
+  assert(not package.loaded["selection_tools.picker"] and not package.loaded["selection_tools.preview"])
+  assert(not package.loaded["selection_tools.matcher"])
+end)
+
 test("highlight attributes are read only for the previewed item and reflect current colors", function()
   local get_hl, calls = vim.api.nvim_get_hl, {}
   vim.api.nvim_set_hl(0, "SelectionLazyHighlight", { fg = "#123456" })
@@ -256,6 +266,67 @@ test("cancelled help reads release descriptors and cannot replace a later picker
     next_picker:close()
   end, debug.traceback)
   vim.api.nvim_get_runtime_file, vim.uv.fs_read, vim.uv.fs_close = runtime, read, close
+  assert(ok, err)
+end)
+
+test("static sources mount before enumeration and immediate cancellation skips preparation", function()
+  local originals = {
+    completion = vim.fn.getcompletion,
+    runtime = vim.api.nvim_get_runtime_file,
+    maps = vim.api.nvim_get_keymap,
+    autocmds = vim.api.nvim_get_autocmds,
+    root = vim.fs.root,
+  }
+  local calls = 0
+  local function count(fn)
+    return function(...)
+      calls = calls + 1
+      return fn(...)
+    end
+  end
+  vim.fn.getcompletion = count(originals.completion)
+  vim.api.nvim_get_runtime_file = count(originals.runtime)
+  vim.api.nvim_get_keymap = count(originals.maps)
+  vim.api.nvim_get_autocmds = count(originals.autocmds)
+  vim.fs.root = count(originals.root)
+  local ok, err = xpcall(function()
+    for _, name in ipairs({ "help", "highlights", "keymaps", "autocmds", "commands", "projects" }) do
+      local before = calls
+      local p = tools.pick(name, { preview = { enabled = false } })
+      assert(vim.api.nvim_win_is_valid(p.input_win) and p.loading and #p.entries == 0, name)
+      eq(calls, before)
+      p:close()
+      vim.wait(10, function()
+        return false
+      end, 1)
+      eq(calls, before)
+    end
+  end, debug.traceback)
+  vim.fn.getcompletion, vim.api.nvim_get_runtime_file = originals.completion, originals.runtime
+  vim.api.nvim_get_keymap, vim.api.nvim_get_autocmds, vim.fs.root = originals.maps, originals.autocmds, originals.root
+  assert(ok, err)
+end)
+
+test("project discovery caches negative roots within one scan", function()
+  local root, oldfiles = vim.fs.root, vim.v.oldfiles
+  local directory = fixture .. "/no-project"
+  vim.fn.mkdir(directory, "p")
+  local calls = 0
+  vim.fs.root = function(path, markers)
+    if path == directory then
+      calls = calls + 1
+      return nil
+    end
+    return root(path, markers)
+  end
+  vim.v.oldfiles = { directory .. "/one.txt", directory .. "/two.txt" }
+  local ok, err = xpcall(function()
+    local p = tools.projects({ dev = {}, preview = { enabled = false } })
+    ready(p)
+    eq(calls, 1)
+    p:close()
+  end, debug.traceback)
+  vim.fs.root, vim.v.oldfiles = root, oldfiles
   assert(ok, err)
 end)
 

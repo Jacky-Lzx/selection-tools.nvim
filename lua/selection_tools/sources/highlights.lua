@@ -1,13 +1,18 @@
 local util = require("selection_tools.sources.util")
 local ns = vim.api.nvim_create_namespace("selection_tools_highlights")
 return function()
-  local items = {}
-  for _, name in ipairs(vim.fn.getcompletion("", "highlight")) do
-    items[#items + 1] = { name = name, key = name, text = name }
-  end
   return {
     prompt = "Highlights",
-    items = items,
+    finder = function(ctx)
+      return util.collect(ctx, function(checkpoint)
+        local items = {}
+        for _, name in ipairs(vim.fn.getcompletion("", "highlight")) do
+          items[#items + 1] = { name = name, key = name, text = name }
+          checkpoint()
+        end
+        return items
+      end)
+    end,
     resume_refresh = true,
     format_item = util.format,
     preview = { enabled = true },
