@@ -6,6 +6,7 @@ return function(opts)
     cwd = vim.fn.fnamemodify(opts.cwd or vim.fn.getcwd(), ":p"),
     live = true,
     match = false,
+    result_layout = "grep",
     syntax = { enabled = true },
     multi = true,
     preview = { enabled = true },

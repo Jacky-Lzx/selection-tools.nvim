@@ -36,6 +36,7 @@ function M.location(file, row, col, text, cwd)
   local code = (text or ""):gsub("[\r\n]+$", "")
   return {
     file = M.path(file, cwd),
+    display_file = file,
     pos = { row, col },
     text = prefix .. code,
     code = code,

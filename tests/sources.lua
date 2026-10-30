@@ -77,7 +77,7 @@ test("grep highlights all regex hits with Unicode and tabs, then clears stale ra
     regex = true,
     debounce_ms = 0,
     preview = { enabled = false },
-    layout = { reverse = true },
+    layout = { reverse = true, width = 0.95 },
   })
   ready(p)
   eq(#p.matches, 2)

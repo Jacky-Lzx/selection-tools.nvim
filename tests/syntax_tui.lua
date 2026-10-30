@@ -39,7 +39,16 @@ local function check()
   local list_color = screen_attr(p.list_win, listrow, start)
   local body_color = screen_attr(p.preview_win, item.pos[1], original)
   assert(list_color == body_color, "Result code does not use the正文 Tree-sitter colors")
-  local file = assert(label:find("test.lua", 1, true)) - 1
+  local file
+  for _, location in
+    ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, { listrow - 1, 0 }, { listrow - 1, -1 }, { details = true }))
+  do
+    if location[4].hl_group == "SelectionToolsFileLocation" then
+      file = location[3]
+      assert(location[4].end_col == #label)
+    end
+  end
+  assert(file and vim.fn.strwidth(label) == p.resolved.width, "File column is not right aligned")
   assert(list_color ~= screen_attr(p.list_win, listrow, file), "Result code is still plain text")
   local list_match = assert(label:find("needle", 1, true)) - 1
   local body_match = assert(source:find("needle", 1, true)) - 1

@@ -83,6 +83,10 @@ require("selection_tools").open({
 
 ## Grep 代码配色与预览定位
 
+`<Space>sg` 默认采用双列布局：代码在左侧左对齐，文件路径和行列号在右侧右对齐。文件位置使用 `SelectionToolsFileLocation`（默认取 `Comment` 的前景色，无斜体），文件图标跟随右侧列。
+
+列宽按终端显示单元计算，支持中文、宽字符及组合字符。长路径从左侧省略以保留文件名，长代码围绕首个命中截取并显示省略号；显示时去掉代码的前导空白。窄窗口逐步隐藏图标、行列号，极窄时只显示代码。省略后的语法及匹配高亮同步调整，原始内容、复制路径及跳转位置保持完整。可用 `grep({ result_layout = "plain" })` 恢复文件位置在前的布局。
+
 `<Space>sg` 使用的 `grep()` 默认给条目中的代码应用 Tree-sitter 配色，沿用当前 runtime 的语言、注入及 `highlights` 查询。解析基于完整文件上下文，能区分跨行字符串中的文字和独立代码；文件名、行列号及图标保留各自样式，搜索命中继续叠加高亮。
 
 只处理进入可见区域的文件和代码行，异步读取并复用解析结果；优先使用已加载 buffer 的未保存内容，不创建或修改源文件 buffer。磁盘缓存在新查询时检查元数据，buffer 缓存按 changedtick 更新。缺少语言解析器/查询或超过限制时保留普通文本及搜索高亮，不会自动安装解析器。
@@ -246,6 +250,7 @@ nvim --headless -u NONE -n -i NONE -l tests/sources.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
+nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 python3 tests/tui.py
 ```
 

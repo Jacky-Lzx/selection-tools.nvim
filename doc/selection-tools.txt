@@ -114,6 +114,15 @@ added to the buffer list; confirmation displays the first marked file.
 The grep source performs live full-text search using ripgrep JSON output.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
+Grep defaults to result_layout="grep": code is left-aligned and file locations
+are right-aligned, with the file icon beside the path. SelectionToolsFileLocation
+uses the Comment foreground without italics. Code indentation is trimmed for
+display; long code is clipped around the first hit. Long paths use a leading
+ellipsis to retain the filename. Widths use terminal cells and preserve composed
+UTF-8 characters. Narrow layouts omit icons/line positions, then hide the file
+column entirely. Syntax/query ranges follow clipped code; original item data,
+copied paths and navigation remain intact. result_layout="plain" restores the
+file-first layout.
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
 injections and multiline strings. Loaded buffers are read without modification;
 other files load asynchronously. Queries use the current runtime's highlights.
@@ -122,8 +131,8 @@ least cache_size or the number of visible rows. New queries validate disk
 metadata; changed buffer ticks refresh buffer snapshots. Missing parsers/queries
 and files over the limits keep plain code plus query matches.
 
-Every nonempty ripgrep submatch is highlighted in the result label, including
-multiple hits per line and regex matches. Matches in the filename are excluded.
+Every visible nonempty ripgrep submatch is highlighted in the result label,
+including multiple hits per line and regex matches. Filenames are excluded.
 Confirming a result opens its exact file/line/column; an empty query does not
 start a search.
 

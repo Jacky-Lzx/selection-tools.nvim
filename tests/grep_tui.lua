@@ -12,7 +12,7 @@ local p = tools.grep({
   regex = true,
   debounce_ms = 0,
   preview = { enabled = false },
-  layout = { reverse = true, input_position = "bottom" },
+  layout = { reverse = true, input_position = "bottom", width = 0.95 },
 })
 local function spans()
   return vim.tbl_filter(function(mark)
@@ -32,7 +32,16 @@ local function check(regex)
       regex and (text == "help" or text:match("^heldout_phase%d$")) or not regex and text == "hel",
       "Wrong grep match range"
     )
-    local filename = assert(line:find("help", 1, true)) - 1
+    local filename
+    for _, location in
+      ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, { row, 0 }, { row, -1 }, { details = true }))
+    do
+      if location[4].hl_group == "SelectionToolsFileLocation" then
+        filename = location[3]
+        break
+      end
+    end
+    assert(filename, "Missing right-aligned file location")
     local match_col = left + vim.fn.strdisplaywidth(line:sub(1, mark[3])) + 1
     local plain_col = left + vim.fn.strdisplaywidth(line:sub(1, filename)) + 1
     assert(

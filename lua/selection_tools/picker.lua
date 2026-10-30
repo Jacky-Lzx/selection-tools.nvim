@@ -301,7 +301,9 @@ function Picker:_render()
   self.row_to_index = {}
   local reverse = self.opts.layout.reverse
   local mark_width = self.opts.multi and 1 or 0
-  local icons, icon_width, prefixes = {}, 0, {}
+  local icons, icon_width, rows = {}, 0, {}
+  local columns = self.opts.result_layout == "grep" and require("selection_tools.grep_row") or nil
+  local wanted_file = 0
   if reverse and count > 0 then
     for row = 1, self.height do
       lines[row] = ""
@@ -316,15 +318,29 @@ function Picker:_render()
       icons[row] = icon
       icon_width = math.max(icon_width, vim.fn.strdisplaywidth(icon.text))
     end
+    if columns then
+      wanted_file =
+        math.max(wanted_file, columns.info(entry).width + (icon and vim.fn.strdisplaywidth(icon.text) + 1 or 0))
+    end
   end
+  local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
     local prefix = self.opts.multi and (self.marks[entry.index] and "*" or " ") or ""
-    if icon_width > 0 then
-      local glyph = icons[row] and icons[row].text or ""
-      prefix = prefix .. glyph .. string.rep(" ", icon_width - vim.fn.strdisplaywidth(glyph) + 1)
+    if columns then
+      rows[row] = columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], self:_highlights(entry))
+    else
+      if icon_width > 0 then
+        local glyph = icons[row] and icons[row].text or ""
+        prefix = prefix .. glyph .. string.rep(" ", icon_width - vim.fn.strdisplaywidth(glyph) + 1)
+      end
+      rows[row] = {
+        text = prefix .. entry.text,
+        segments = { { 0, #entry.text, #prefix } },
+        icon = icons[row] and { first = mark_width, last = mark_width + #icons[row].text, hl = icons[row].hl },
+      }
     end
-    prefixes[row], lines[row] = #prefix, prefix .. entry.text
+    lines[row] = rows[row].text
   end
   if count == 0 then
     lines[1] = self.error and ("Error: " .. single_line(self.error))
@@ -337,12 +353,32 @@ function Picker:_render()
   api.nvim_buf_clear_namespace(self.list_buf, ns, 0, -1)
   if count > 0 then
     for row, index in pairs(self.row_to_index) do
-      local icon = icons[row]
+      local display = rows[row]
+      local function highlight(first, last, group, priority)
+        for _, segment in ipairs(display.segments) do
+          local start, finish = math.max(first, segment[1]), math.min(last, segment[2])
+          if start < finish then
+            api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, segment[3] + start - segment[1], {
+              end_col = segment[3] + finish - segment[1],
+              hl_group = group,
+              priority = priority,
+            })
+          end
+        end
+      end
+      local icon = display.icon
       if icon then
-        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, mark_width, {
-          end_col = mark_width + #icon.text,
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, icon.first, {
+          end_col = icon.last,
           hl_group = icon.hl,
           priority = 120,
+        })
+      end
+      if display.file then
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, display.file[1], {
+          end_col = display.file[2],
+          hl_group = "SelectionToolsFileLocation",
+          priority = 100,
         })
       end
       if not self.positions[index] and self.match_backend == "skim" then
@@ -351,27 +387,18 @@ function Picker:_render()
           or {}
       end
       for _, span in ipairs(self:_syntax(self.matches[index])) do
-        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, prefixes[row] + span[1], {
-          end_col = prefixes[row] + span[2],
-          hl_group = span.hl,
-          priority = span.priority,
-        })
+        highlight(span[1], span[2], span.hl, span.priority)
       end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
-        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, prefixes[row] + range[1], {
-          end_col = prefixes[row] + range[2],
-          hl_group = "SelectionToolsMatch",
-          priority = 110,
-        })
+        highlight(range[1], range[2], "SelectionToolsMatch", 110)
       end
       for _, pos in ipairs(self.positions[index] or {}) do
-        local start = vim.fn.byteidx(self.matches[index].text, pos) + prefixes[row]
-        local finish = vim.fn.byteidx(self.matches[index].text, pos + 1) + prefixes[row]
-        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, start, {
-          end_col = finish,
-          hl_group = "SelectionToolsMatch",
-          priority = 110,
-        })
+        highlight(
+          vim.fn.byteidx(self.matches[index].text, pos),
+          vim.fn.byteidx(self.matches[index].text, pos + 1),
+          "SelectionToolsMatch",
+          110
+        )
       end
     end
     local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
@@ -896,6 +923,12 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
   api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
   api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })
+  local file_color = api.nvim_get_hl(0, { name = "Comment", link = false })
+  api.nvim_set_hl(
+    0,
+    "SelectionToolsFileLocation",
+    { default = true, fg = file_color.fg, ctermfg = file_color.ctermfg, italic = false }
+  )
   api.nvim_set_hl(0, "SelectionToolsPreviewLine", { default = true, link = "CursorLine" })
   api.nvim_set_hl(0, "SelectionToolsPreviewMatch", { default = true, link = "Search" })
   self:_events()

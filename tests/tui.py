@@ -7,6 +7,7 @@ from pathlib import Path
 import pty
 import re
 import select
+import signal
 import shutil
 import struct
 import subprocess
@@ -34,6 +35,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "grep_columns_tui":
+            actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
         if case == "grep_tui":
             actions.update(type=b"hel")
         if case == "match_tui":
@@ -58,7 +61,12 @@ def run_case(case):
                 stage_file = Path(directory, "stage")
                 stage = stage_file.read_text().strip() if stage_file.exists() else ""
                 if stage in actions and stage not in handled:
-                    os.write(master, actions[stage])
+                    if case == "grep_columns_tui" and stage.startswith("resize_"):
+                        columns = {"resize_narrow": 48, "resize_tiny": 16, "resize_wide": 120}[stage]
+                        fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 30, columns, 0, 0))
+                        os.kill(process.pid, signal.SIGWINCH)
+                    else:
+                        os.write(master, actions[stage])
                     handled.add(stage)
             if process.poll() is None:
                 process.kill()
@@ -84,6 +92,7 @@ if __name__ == "__main__":
     run_case("item_icons_tui")
     run_case("match_tui")
     run_case("grep_tui")
+    run_case("grep_columns_tui")
     run_case("syntax_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
