@@ -210,6 +210,27 @@ test("jump source navigates the native window jump list", function()
   vim.bo.modified = false
 end)
 
+test("mark source includes local and global marks and jumps to their exact columns", function()
+  vim.cmd.enew()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "first", "second line" })
+  vim.api.nvim_buf_set_mark(0, "a", 2, 3, {})
+  vim.api.nvim_buf_set_mark(0, "A", 1, 1, {})
+  local p = tools.marks()
+  local names = {}
+  for i, entry in ipairs(p.matches) do
+    names[entry.item.name] = true
+    if entry.item.name == "'a" then
+      p.index = i
+    end
+  end
+  assert(names["'a"] and names["'A"])
+  p:confirm()
+  eq(vim.api.nvim_win_get_cursor(0), { 2, 3 })
+  vim.api.nvim_buf_del_mark(0, "a")
+  vim.api.nvim_del_mark("A")
+  vim.bo.modified = false
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
