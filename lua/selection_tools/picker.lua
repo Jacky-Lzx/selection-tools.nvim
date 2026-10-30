@@ -51,6 +51,8 @@ end
 local function scratch(filetype)
   local buf = api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
+  -- Completion plugins must not replace picker navigation or confirmation keys.
+  vim.b[buf].completion = false
   vim.bo[buf].filetype = filetype
   vim.bo[buf].swapfile = false
   return buf
