@@ -204,7 +204,7 @@ function Picker:_render()
   local lines = {}
   self.row_to_index = {}
   local reverse = self.opts.layout.reverse
-  local mark_width = self.opts.multi and 2 or 0
+  local mark_width = self.opts.multi and 1 or 0
   local icons, icon_width, prefixes = {}, 0, {}
   if reverse and count > 0 then
     for row = 1, self.height do
@@ -218,12 +218,12 @@ function Picker:_render()
     local icon = self:_icon(entry)
     if icon then
       icons[row] = icon
-      icon_width = math.max(icon_width, 2, vim.fn.strdisplaywidth(icon.text))
+      icon_width = math.max(icon_width, vim.fn.strdisplaywidth(icon.text))
     end
   end
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
-    local prefix = self.opts.multi and (self.marks[entry.index] and "* " or "  ") or ""
+    local prefix = self.opts.multi and (self.marks[entry.index] and "*" or " ") or ""
     if icon_width > 0 then
       local glyph = icons[row] and icons[row].text or ""
       prefix = prefix .. glyph .. string.rep(" ", icon_width - vim.fn.strdisplaywidth(glyph) + 1)

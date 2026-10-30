@@ -45,8 +45,8 @@ local function check_screen(item, glyph)
   vim.cmd.redraw()
   local top, left = unpack(vim.api.nvim_win_get_position(p.list_win))
   local row = top + p.height - (p.index - p.offset) + 1
-  assert(vim.fn.screenstring(row, left + 3) == glyph, "Missing visible icon")
-  assert(vim.fn.screenstring(row, left + 6) == "b", "File labels are not aligned")
+  assert(vim.fn.screenstring(row, left + 2) == glyph, "Missing visible icon")
+  assert(vim.fn.screenstring(row, left + 5) == "b", "File labels are not aligned")
   local line = vim.api.nvim_buf_get_lines(p.list_buf, row - top - 1, row - top, false)[1]
   assert(line:find(item.text, 1, true))
   assert(vim.api.nvim_get_current_win() == p.input_win and vim.api.nvim_get_mode().mode == "i")
