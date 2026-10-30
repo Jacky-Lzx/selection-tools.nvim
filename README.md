@@ -217,3 +217,5 @@ python3 tests/tui.py
 - `recent({ cwd, buffers = true })`：按最近使用顺序合并已列出的文件 buffer 和 `v:oldfiles`，跳过已删除文件并对路径别名去重；显式 `cwd` 可限定目录。
 
 - `resume()` / `:SelectionTools resume`：恢复上次 picker 的搜索源、查询、选中位置、多选标记和预览滚动。静态列表保留原始对象，实时或未完成的搜索重新加载；`resume = false` 可禁用单个 picker 的记录。
+
+- `todo_comments({ cwd, keywords })`：按 `KEYWORD:` 扫描 TODO 标记，默认包含 NOTE；若 todo-comments 已配置则读取其关键字与别名，也可显式限定关键字列表。独立使用不依赖 todo-comments 插件。

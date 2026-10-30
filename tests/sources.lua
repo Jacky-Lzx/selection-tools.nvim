@@ -148,6 +148,25 @@ test("resume restores source objects, query, marks, cursor and preview scroll", 
   p:close()
 end)
 
+test("TODO source includes NOTE by default and supports exact keyword filters", function()
+  vim.fn.mkdir(fixture .. "/todo", "p")
+  vim.fn.writefile(
+    { "-- TODO: first", "-- NOTE: information", "-- FIXME: repair", "TODO without colon" },
+    fixture .. "/todo/sample.lua"
+  )
+  local p = tools.todo_comments({ cwd = fixture .. "/todo", debounce_ms = 0 })
+  ready(p)
+  eq(#p.entries, 3)
+  p:close()
+  p = tools.todo_comments({ cwd = fixture .. "/todo", keywords = { "TODO", "FIXME" }, debounce_ms = 0 })
+  ready(p)
+  eq(#p.entries, 2)
+  p:set_query("FIXME")
+  eq(p:current().keyword, "FIXME")
+  p:confirm()
+  eq(vim.api.nvim_win_get_cursor(0)[1], 3)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
