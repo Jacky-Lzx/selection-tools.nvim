@@ -9,6 +9,7 @@ CONTENTS                                                    *selection-tools*
   4. Finder contract                |selection-tools-finder|
   5. Picker methods                 |selection-tools-methods|
   6. Matching backends              |selection-tools-matcher|
+  7. Built-in sources               |selection-tools-sources|
 
 Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua dependencies.
 
@@ -124,6 +125,9 @@ selection.open(opts)
       prompt         Window title; default 'Select'.
       query          Initial query; default ''.
       on_choice      Optional fun(item, original_index); nils on cancellation.
+      on_close       Optional fun(picker), after cleanup, before on_choice.
+      resume         false excludes this picker from resume; default true.
+      resume_refresh Recreate this source on resume; default false.
       finder         Asynchronous/synchronous producer; see below.
       live           Restart finder when query changes; default false.
       match          Locally fuzzy-match results; default true. Set false if
@@ -255,5 +259,82 @@ the current backend, pending flag and last fallback error.
 
 Per-call matcher options override setup defaults. The threshold is configurable;
 it is a conservative default rather than a universal performance crossover.
+
+===============================================================================
+7. BUILT-IN SOURCES                                  *selection-tools-sources*
+
+Every source has selection.<name>(opts) and selection.pick(name, opts). The
+:SelectionTools command completes their names. Setup options and per-call
+options apply to every source; per-call values override source defaults.
+
+  grep             Live rg search. Empty input skips scanning. Literal smart
+                   case by default; regex=true uses regular expressions.
+                   cwd, hidden, ignored, limit=10000, debounce_ms=30.
+  projects         Current, recent and explicit project roots; dev directories
+                   scanned up to max_depth=2. projects={...}, dev={...},
+                   markers={...}, recent=true. Confirm changes cwd and opens
+                   files; open_files=false only changes cwd. Directory preview.
+  recent           Listed buffers by last use, then v:oldfiles. Existing regular
+                   files only, canonical paths deduplicated. buffers=false
+                   excludes buffers; explicit cwd restricts the directory.
+  todo_comments    rg scan of KEYWORD: markers; includes NOTE by default.
+                   keywords={...} restricts tags. Reads todo-comments keyword
+                   aliases when configured, otherwise uses built-in defaults.
+                   Does not depend on todo-comments being installed.
+  registers        Multiline register preview. Confirm copies to register='+'
+                   preserving type. registers='ab' limits registers read.
+                   Defaults avoid actively querying an OSC 52 clipboard.
+  jumps            The invoking window's native jump list, newest first.
+                   Confirm uses native Ctrl-O/Ctrl-I navigation.
+  marks            Local and global marks with file/line/column previews.
+  undo             Native undo tree including branches. Diff preview uses a
+                   clone and temporary undo file, removed on close. Confirm
+                   changes the original buffer only if its text is unchanged.
+  search_history   Newest search patterns. Confirm restores / and searches the
+                   invoking window using the native pattern semantics.
+  command_history  Newest Ex commands. Confirm executes the selected command
+                   in the invoking window and adds it to command history.
+  qflist           Current Quickfix list. File preview, native :cc selection.
+  loclist          Invoking window's location list, native :ll selection.
+                   Both preserve list indexes and reject replaced entries.
+  commands         Built-in, global and buffer-local commands. Buffer-local
+                   definitions take precedence. Confirm fills :Command for
+                   arguments; execute=true executes immediately.
+  autocmds         Event/group/pattern/description search and definition preview.
+                   Confirm jumps to Lua source or opens read-only details.
+  keymaps          Global and buffer-local mappings, all modes. Local mappings
+                   take precedence. modes={...}, global=false, ['local']=false,
+                   plugs=true adjust inclusion. Confirm replays keys in Normal
+                   mode, matching Snacks. action='definition' navigates instead.
+  help             Runtime doc/tags search, positioned preview, native :help.
+  man              Index local man directories from manpath -q or man -w;
+                   paths={...} overrides discovery. Async man rendering and
+                   native :Man confirmation. Requires man on PATH.
+  spelling         Native suggestions for the word at/after the cursor. Confirm
+                   replaces only that word, refusing stale-buffer edits.
+                   Compact forward layout with the input at the top.
+  highlights       Highlight names, resolved properties and styled preview.
+                   Confirm closes; bind the copy action to copy the name.
+  icons            Nerd Fonts and Emoji catalogs, optional nvim-web-devicons
+                   and built-in symbols. Confirm inserts the glyph into the
+                   original buffer, refusing stale-buffer edits.
+                   curl downloads public catalogs asynchronously on first use;
+                   cache: stdpath('cache')/selection-tools/icons. Failures leave
+                   local symbols available. icon_sources={} disables downloads.
+                   icons={{icon='λ',name='lambda'}} supplies a list directly.
+                   custom_sources={label='/path/icons.json'} loads a local list
+                   of {icon,name,category} objects or {glyph,name} pairs.
+
+selection.resume(opts) / :SelectionTools resume
+    Restore the last picker's source, query, current item, marks, list offset
+    and preview scroll. Static sources retain original Lua objects. Live,
+    unfinished and resume_refresh sources reload candidates with the saved
+    query. There is one in-memory snapshot; no cross-session persistence.
+    A custom source can set resume_refresh=true to rebuild origin-sensitive
+    callbacks, and item.key to identify candidates across refreshed ordering.
+
+File locations use item.file/item.bufnr and item.pos={1-based row, 0-based byte
+column}. item.search is an optional literal preview anchor (used by help tags).
+TODO and grep results expose file/pos and can use the standard file preview.
 
 vim:tw=78:ts=8:ft=help:norl:

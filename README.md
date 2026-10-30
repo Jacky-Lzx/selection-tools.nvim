@@ -201,16 +201,15 @@ local picker = require("selection_tools").open({
 ```sh
 stylua --check lua plugin tests
 nvim --headless -u NONE -n -i NONE -l tests/run.lua
+nvim --headless -u NONE -n -i NONE -l tests/sources.lua
 python3 tests/tui.py
 ```
 
-测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端和真实终端输入。已安装 skim 时，还会运行真实 skim 测试，以及 6 万条候选的连续输入、预览和多选终端测试；未安装时跳过这些外部集成测试。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。
+测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端、各内置搜索源的确认行为和真实终端输入。图标目录的下载、缓存、失败及取消测试使用离线模拟。已安装 skim 时，还会运行真实 skim 测试，以及 6 万条候选的连续输入、预览和多选终端测试；未安装时跳过这些外部集成测试。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。
 
 ## 内置搜索源
 
 - `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转，空查询不扫描目录。
-
-新增搜索源测试：`nvim --headless -u NONE -n -i NONE -l tests/sources.lua`。
 
 - `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
 
@@ -251,3 +250,7 @@ python3 tests/tui.py
 - `highlights()`：搜索高亮组，预览真实样式、链接和解析后的颜色属性；确认关闭，C-y 可复制名称。
 
 - `icons()`：搜索 Nerd Fonts、Emoji、可选 devicons 和内置符号，确认后插入原 buffer。首次异步下载并缓存公开字形目录；icon_sources={} 禁用下载，icons 或 custom_sources 可提供本地目录。
+
+所有搜索源均可通过 `pick(name, opts)`、同名 Lua 函数或 `:SelectionTools name` 调用。需要实时全文搜索的快捷键可调用 `grep({ regex = true })`，保持原 Snacks 正则搜索语义。
+
+图标目录来自 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) 和 [unicode-emoji-json](https://github.com/muan/unicode-emoji-json)，首次下载需要 curl；失败时仍可使用本地符号和 devicons。`custom_sources = { name = "/path/icons.json" }` 接受 `[{"icon":"λ","name":"lambda","category":"math"}]` 或 `[["λ","lambda"]]`。远程目录缓存位于 `stdpath("cache")/selection-tools/icons/`。
