@@ -18,6 +18,7 @@ local M = {
     "autocmds",
     "keymaps",
     "help",
+    "man",
   },
 }
 

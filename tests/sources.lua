@@ -393,6 +393,28 @@ test("help tags preview the definition and open native help", function()
   vim.opt.runtimepath:remove(fixture .. "/help")
 end)
 
+test("man pages use directory indexes and render external output without overstrikes", function()
+  vim.fn.mkdir(fixture .. "/manual/man1", "p")
+  vim.fn.writefile({ "test" }, fixture .. "/manual/man1/selection-man-test.1.gz")
+  local command = fixture .. "/fake-man"
+  vim.fn.writefile({ "#!/bin/sh", "printf 'N\\bNAME\\nselection manual\\n'" }, command)
+  vim.fn.setfperm(command, "rwx------")
+  local args
+  vim.api.nvim_create_user_command("Man", function(cmd)
+    args = cmd.fargs
+  end, { nargs = "+" })
+  local p = tools.man({ paths = { fixture .. "/manual" }, man_command = command })
+  ready(p)
+  eq(#p.matches, 1)
+  assert(vim.wait(1000, function()
+    return vim.bo[p.preview_buf].filetype == "man"
+  end, 2))
+  eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false), { "NAME" })
+  p:confirm()
+  eq(args, { "1", "selection-man-test" })
+  vim.api.nvim_del_user_command("Man")
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
