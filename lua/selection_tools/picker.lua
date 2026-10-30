@@ -798,6 +798,9 @@ function Picker:resize()
       api.nvim_win_set_config(self[name .. "_win"], resolved[name])
     end
   end
+  if self.preview and self.preview.is_image then
+    self.preview.initialized = false
+  end
   self:_render()
 end
 

@@ -154,6 +154,13 @@ cancel/restart the finder without changing the input and are retained by resume.
 File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
 globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).
 
+Image previews: preview.image={enabled=true,backend="auto",max_size=20 MiB,
+timeout_ms=5000}. Existing Snacks.image uses native graphics in supported
+terminals; otherwise chafa produces colored symbol previews. backend="chafa"
+or "snacks" forces one, and preview.image=false disables rendering. PDF page 1
+requires pdftoppm; SVG may use rsvg-convert. Dependencies load only for images.
+Cancel/resize/close release conversions, temporary files and native placements.
+
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
 injections and multiline strings. Loaded buffers are read without modification;
 other files load asynchronously. Queries use the current runtime's highlights.

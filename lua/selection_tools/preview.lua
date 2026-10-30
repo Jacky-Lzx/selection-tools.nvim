@@ -106,15 +106,19 @@ function Preview:update(item, index)
     return
   end
   self:cancel()
+  self.is_image = false
   self.initialized, self.item, self.index, self.tick = true, item, index, tick
   local generation = self.generation
   local function current()
     return not self.picker.closed and self.generation == generation
   end
-  local function deliver(lines, ft, title, pos)
+  local function deliver(lines, ft, title, pos, decorate)
     vim.schedule(function()
       if current() then
         self:write(lines, ft, title, pos)
+        if decorate and current() then
+          decorate()
+        end
       end
     end)
   end
@@ -192,6 +196,31 @@ function Preview:update(item, index)
   if not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
     path = vim.fs.joinpath(opts.cwd or vim.fn.getcwd(), path)
   end
+  local image = opts.preview.image
+  local ext = (path:match("%.([^%.]+)$") or ""):lower()
+  if
+    image ~= false
+    and (not image or image.enabled ~= false)
+    and vim.tbl_contains(
+      { "png", "jpg", "jpeg", "gif", "bmp", "webp", "avif", "tif", "tiff", "heic", "svg", "pdf" },
+      ext
+    )
+  then
+    self.is_image = true
+    self:write({ "Loading image…" }, nil, vim.fn.fnamemodify(path, ":t"))
+    self.cancel_provider = require("selection_tools.image").render(path, type(image) == "table" and image or {}, {
+      buf = self.buf,
+      win = self.picker.preview_win,
+      is_cancelled = function()
+        return not current()
+      end,
+      write = function(lines, decorate)
+        deliver(lines, nil, vim.fn.fnamemodify(path, ":t"), nil, decorate)
+      end,
+    })
+    return
+  end
+  self.is_image = false
   local title = vim.fn.fnamemodify(path, ":t"):gsub("[\r\n]", " ")
   -- Keep the previous contents, highlighting and scroll position during I/O.
   -- Only the first preview needs a loading placeholder.

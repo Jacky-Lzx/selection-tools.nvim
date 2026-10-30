@@ -98,6 +98,10 @@ if __name__ == "__main__":
     run_case("grep_columns_tui")
     run_case("workflows_tui")
     run_case("syntax_tui")
+    if shutil.which("chafa") and shutil.which("rsvg-convert"):
+        run_case("images_tui")
+    else:
+        print("SKIP image terminal integration (chafa/rsvg-convert not installed)")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:

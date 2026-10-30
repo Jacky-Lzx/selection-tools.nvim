@@ -114,6 +114,12 @@ require("selection_tools").grep({
 
 也可调用 `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })`，或在 `files()` / `grep()` 的调用选项中指定。
 
+## 图片预览
+
+文件列表中的 PNG/JPEG/GIF/WebP 等图片、SVG 和 PDF 默认显示图像预览。`preview.image.backend = "auto"` 在现有 Snacks.image 和终端支持时使用原生图像，否则按需调用 chafa，转换为带颜色高亮的字符图；PDF 显示第一页，需要 `pdftoppm`，SVG 可使用 `rsvg-convert`。不会自动安装依赖。Snacks 不作为必需依赖，也不接管本插件的 picker。
+
+`preview.image = false` 关闭图片渲染，或设置 `{ backend = "chafa" }` / `{ backend = "snacks" }` 固定后端。默认最大源文件为 20 MiB，转换命令超时为 5000 ms；可通过 `max_size`、`timeout_ms` 调整。切换、缩放和关闭预览会取消转换、清理临时文件及原生图像 placement，普通文本继续优先显示 buffer 的未保存内容。
+
 ## 流式全文搜索
 
 Grep 边接收 ripgrep JSON 边展示结果，分批解析时保持输入可响应；追加结果保留当前条目和多选标记。达到 `limit`（默认 10000）、`max_output`（默认 32 MiB）或 `max_line_bytes`（默认 1 MiB）后停止进程，右下角显示 `Limit reached`，具体原因可读取 `picker.truncated`。达到结果上限表示“上限已到”，不代表总命中数已知。新查询、切换选项及关闭窗口会取消旧进程并丢弃迟到的数据。
@@ -271,6 +277,7 @@ nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
+nvim --headless -u NONE -n -i NONE -l tests/images.lua
 python3 tests/tui.py
 ```
 
