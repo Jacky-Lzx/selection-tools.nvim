@@ -1,5 +1,6 @@
-local M =
-  { names = { "files", "buffers", "grep", "projects", "recent", "todo_comments", "registers", "jumps", "marks" } }
+local M = {
+  names = { "files", "buffers", "grep", "projects", "recent", "todo_comments", "registers", "jumps", "marks", "undo" },
+}
 
 return setmetatable(M, {
   __index = function(self, name)

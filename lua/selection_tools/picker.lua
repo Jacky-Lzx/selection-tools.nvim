@@ -533,6 +533,12 @@ function Picker:close(item, index, selected)
   if active == self then
     active = nil
   end
+  if self.opts.on_close then
+    local ok, err = pcall(self.opts.on_close, self)
+    if not ok then
+      notify(err)
+    end
+  end
   if self.opts.on_choice then
     self.opts.on_choice(item, index, selected)
   end

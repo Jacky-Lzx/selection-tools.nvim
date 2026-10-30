@@ -231,6 +231,34 @@ test("mark source includes local and global marks and jumps to their exact colum
   vim.bo.modified = false
 end)
 
+test("undo history previews a cloned tree and changes the original only on confirmation", function()
+  vim.cmd.enew()
+  vim.cmd("normal! ifirst\027")
+  vim.cmd("normal! A\007u second\027")
+  local original = vim.api.nvim_get_current_buf()
+  local lines, tick = vim.api.nvim_buf_get_lines(0, 0, -1, false), vim.api.nvim_buf_get_changedtick(0)
+  local current_seq = vim.fn.undotree().seq_cur
+  local p = tools.undo()
+  local seq
+  for i, entry in ipairs(p.matches) do
+    if entry.item.seq > 0 and entry.item.seq < current_seq then
+      p.index = i
+      seq = entry.item.seq
+      break
+    end
+  end
+  assert(seq, "missing prior undo sequence")
+  p:_render()
+  assert(vim.wait(1000, function()
+    return vim.bo[p.preview_buf].filetype == "diff"
+  end, 2))
+  eq(vim.api.nvim_buf_get_lines(original, 0, -1, false), lines)
+  eq(vim.api.nvim_buf_get_changedtick(original), tick)
+  p:confirm()
+  eq(vim.api.nvim_buf_get_lines(original, 0, -1, false), { "first" })
+  vim.bo.modified = false
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
