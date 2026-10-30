@@ -23,29 +23,47 @@ local function single_line(value)
   return tostring(value):gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("\t", "  ")
 end
 
-local function dimension(value, available)
-  return math.max(1, math.min(available, math.floor(value <= 1 and available * value or value)))
+function Picker:_layout()
+  self.resolved = require("selection_tools.layout").resolve(self.opts)
+  self.height = self.resolved.height
+  return self.resolved
 end
 
-function Picker:_layout()
-  local columns, lines = vim.o.columns, vim.o.lines - vim.o.cmdheight
-  assert(columns >= 12 and lines >= 8, "selection-tools: window requires at least 12 columns and 8 rows")
-  local layout = self.opts.layout
-  local width = dimension(layout.width, columns - 4)
-  local height = dimension(layout.height, lines - 6)
-  local row = math.max(0, math.floor((lines - height - 5) / 2))
-  local col = math.floor((columns - width - 2) / 2)
-  local common =
-    { relative = "editor", style = "minimal", border = layout.border, width = width, col = col, zindex = 60 }
-  local input = vim.tbl_extend("force", common, {
-    row = row,
-    height = 1,
-    title = " " .. single_line(self.opts.prompt or "Select") .. " ",
-    title_pos = "left",
+function Picker:_draw_frame()
+  if not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
+    return
+  end
+  local lines = {}
+  for i = 1, self.resolved.total_height do
+    lines[i] = ""
+  end
+  for _, row in ipairs(self.resolved.separators) do
+    lines[row + 1] = string.rep("─", self.resolved.width)
+  end
+  vim.bo[self.frame_buf].modifiable = true
+  api.nvim_buf_set_lines(self.frame_buf, 0, -1, false, lines)
+  vim.bo[self.frame_buf].modifiable = false
+  api.nvim_buf_clear_namespace(self.frame_buf, ns, 0, -1)
+  for _, row in ipairs(self.resolved.separators) do
+    api.nvim_buf_set_extmark(self.frame_buf, ns, row, 0, { line_hl_group = "SelectionToolsBorder" })
+  end
+  if self.preview_title and self.resolved.preview then
+    local row = self.opts.layout.input_position == "bottom" and self.resolved.preview.height
+      or self.resolved.separators[#self.resolved.separators]
+    api.nvim_buf_set_extmark(self.frame_buf, ns, row, 0, {
+      virt_text = {
+        { " " .. vim.fn.strcharpart(single_line(self.preview_title), 0, self.resolved.width - 4) .. " ", "FloatTitle" },
+      },
+      virt_text_pos = "overlay",
+      virt_text_win_col = 1,
+    })
+  end
+  local marked = vim.tbl_count(self.marks)
+  local status = self.error and "Error" or (self.loading and "Loading" or tostring(#self.entries))
+  api.nvim_win_set_config(self.frame_win, {
+    footer = (" %d / %s%s "):format(#self.matches, status, marked > 0 and (" · " .. marked .. " selected") or ""),
+    footer_pos = "right",
   })
-  local list = vim.tbl_extend("force", common, { row = row + 3, height = height })
-  self.height = height
-  return input, list
 end
 
 local function scratch(filetype)
@@ -66,7 +84,7 @@ function Picker:_set_items(items)
     entries[index] = { item = item, index = index, text = single_line(text) }
     candidates[index] = { index = index, text = entries[index].text }
   end
-  self.entries, self.candidates = entries, candidates
+  self.entries, self.candidates, self.marks = entries, candidates, {}
   self:_filter()
 end
 
@@ -75,7 +93,7 @@ function Picker:_filter()
     return
   end
   self.positions = {}
-  if self.query == "" or self.opts.match == false then
+  if self.query == "" or self.opts.match == false or #self.entries == 0 then
     self.matches = self.entries
   else
     local result = vim.fn.matchfuzzypos(self.candidates, self.query, { key = "text", matchseq = 1 })
@@ -102,21 +120,33 @@ function Picker:_render()
     self.offset = self.index - self.height
   end
   local lines = {}
+  self.row_to_index = {}
+  local reverse = self.opts.layout.reverse
+  local prefix = self.opts.multi and 2 or 0
+  if reverse and count > 0 then
+    for row = 1, self.height do
+      lines[row] = ""
+    end
+  end
   for i = self.offset + 1, math.min(count, self.offset + self.height) do
-    lines[#lines + 1] = self.matches[i].text
+    local row = reverse and (self.height - (i - self.offset) + 1) or (i - self.offset)
+    local entry = self.matches[i]
+    lines[row] = (self.opts.multi and (self.marks[entry.index] and "* " or "  ") or "") .. entry.text
+    self.row_to_index[row] = i
   end
   if count == 0 then
     lines[1] = self.error and ("Error: " .. single_line(self.error)) or (self.loading and "Loading…" or "No results")
   end
+  self.rendering = true
   vim.bo[self.list_buf].modifiable = true
   api.nvim_buf_set_lines(self.list_buf, 0, -1, false, lines)
   vim.bo[self.list_buf].modifiable = false
   api.nvim_buf_clear_namespace(self.list_buf, ns, 0, -1)
   if count > 0 then
-    for row = 1, #lines do
-      for _, pos in ipairs(self.positions[self.offset + row] or {}) do
-        local start = vim.fn.byteidx(lines[row], pos)
-        local finish = vim.fn.byteidx(lines[row], pos + 1)
+    for row, index in pairs(self.row_to_index) do
+      for _, pos in ipairs(self.positions[index] or {}) do
+        local start = vim.fn.byteidx(self.matches[index].text, pos) + prefix
+        local finish = vim.fn.byteidx(self.matches[index].text, pos + 1) + prefix
         api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, start, {
           end_col = finish,
           hl_group = "SelectionToolsMatch",
@@ -124,16 +154,23 @@ function Picker:_render()
         })
       end
     end
-    api.nvim_buf_set_extmark(self.list_buf, ns, self.index - self.offset - 1, 0, {
-      line_hl_group = "SelectionToolsSelected",
-      priority = 100,
-    })
-    api.nvim_win_set_cursor(self.list_win, { self.index - self.offset, 0 })
+    local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
+    api.nvim_buf_set_extmark(
+      self.list_buf,
+      ns,
+      row - 1,
+      0,
+      { line_hl_group = "SelectionToolsSelected", priority = 100 }
+    )
+    api.nvim_win_set_cursor(self.list_win, { row, 0 })
   else
     api.nvim_buf_set_extmark(self.list_buf, ns, 0, 0, { line_hl_group = "Comment" })
   end
-  local status = self.error and "Error" or (self.loading and "Loading" or tostring(#self.entries))
-  api.nvim_win_set_config(self.list_win, { footer = (" %d / %s "):format(count, status), footer_pos = "right" })
+  self.rendering = false
+  self:_draw_frame()
+  if self.preview and self.preview_win then
+    self.preview:update(self:current())
+  end
 end
 
 function Picker:_cancel_finder()
@@ -228,6 +265,9 @@ function Picker:set_query(query)
     return
   end
   self.query = query
+  if not self.navigating_history then
+    self.history_cursor, self.history_draft = #self.history + 1, query
+  end
   if self.opts.live and self.opts.finder then
     self:_find()
   else
@@ -240,6 +280,74 @@ function Picker:move(delta)
     self.index = ((self.index - 1 + delta) % #self.matches) + 1
     self:_render()
   end
+end
+
+---Move in screen coordinates, respecting a reversed result list.
+function Picker:move_visual(delta)
+  self:move(self.opts.layout.reverse and -delta or delta)
+end
+
+function Picker:scroll_list(direction)
+  if self.closed or #self.matches == 0 then
+    return
+  end
+  local delta = direction * math.max(1, math.floor(self.height / 2))
+  if self.opts.layout.reverse then
+    delta = -delta
+  end
+  self.index = math.max(1, math.min(#self.matches, self.index + delta))
+  self:_render()
+end
+
+function Picker:scroll_preview(direction)
+  if self.closed or not self.preview_win or not api.nvim_win_is_valid(self.preview_win) then
+    return
+  end
+  local amount = math.max(1, math.floor(api.nvim_win_get_height(self.preview_win) / 2))
+  api.nvim_win_call(self.preview_win, function()
+    vim.cmd("normal! " .. amount .. (direction > 0 and "\004" or "\021"))
+  end)
+end
+
+function Picker:toggle()
+  if self.closed or not self.opts.multi then
+    return
+  end
+  local entry = self.matches[self.index]
+  if entry then
+    self.marks[entry.index] = not self.marks[entry.index] or nil
+    self:_render()
+  end
+end
+
+---Return marked items in source order, optionally falling back to the cursor.
+function Picker:selected(opts)
+  local items = {}
+  for _, entry in ipairs(self.entries) do
+    if self.marks[entry.index] then
+      items[#items + 1] = entry.item
+    end
+  end
+  if #items == 0 and opts and opts.fallback then
+    local item, index = self:current()
+    if index then
+      items[1] = item
+    end
+  end
+  return items
+end
+
+function Picker:history_move(direction)
+  if self.closed or #self.history == 0 then
+    return
+  end
+  if self.history_cursor == #self.history + 1 then
+    self.history_draft = self.query
+  end
+  self.history_cursor = math.max(1, math.min(#self.history + 1, self.history_cursor + direction))
+  self.navigating_history = true
+  self:set_query(self.history[self.history_cursor] or self.history_draft)
+  self.navigating_history = false
 end
 
 ---@return any item
@@ -257,32 +365,36 @@ function Picker:confirm()
   end
   local item, index = self:current()
   if index then
-    self:close(item, index)
+    self:close(item, index, self:selected({ fallback = true }))
   end
 end
 
 ---Close and call on_choice exactly once. No arguments means cancellation.
-function Picker:close(item, index)
+function Picker:close(item, index, selected)
   if self.closed then
     return
   end
   self.closed = true
   self:_cancel_finder()
+  if self.preview then
+    self.preview:cancel()
+  end
+  require("selection_tools.history").add(self.history_key, self.query, self.opts.history)
   if self.group then
     api.nvim_del_augroup_by_id(self.group)
   end
   local focused = api.nvim_get_current_win()
-  local owns_focus = focused == self.input_win or focused == self.list_win
+  local owns_focus = focused == self.input_win or focused == self.list_win or focused == self.preview_win
   if owns_focus then
     vim.cmd.stopinsert()
   end
-  for _, field in ipairs({ "input_win", "list_win" }) do
+  for _, field in ipairs({ "input_win", "list_win", "preview_win", "frame_win" }) do
     local win = self[field]
     if win and api.nvim_win_is_valid(win) then
       api.nvim_win_close(win, true)
     end
   end
-  for _, field in ipairs({ "input_buf", "list_buf" }) do
+  for _, field in ipairs({ "input_buf", "list_buf", "preview_buf", "frame_buf" }) do
     local buf = self[field]
     if buf and api.nvim_buf_is_valid(buf) then
       api.nvim_buf_delete(buf, { force = true })
@@ -295,7 +407,7 @@ function Picker:close(item, index)
     active = nil
   end
   if self.opts.on_choice then
-    self.opts.on_choice(item, index)
+    self.opts.on_choice(item, index, selected)
   end
 end
 
@@ -318,7 +430,12 @@ function Picker:_events()
   api.nvim_create_autocmd("WinClosed", {
     group = self.group,
     callback = function(ev)
-      if tonumber(ev.match) == self.input_win or tonumber(ev.match) == self.list_win then
+      if
+        tonumber(ev.match) == self.input_win
+        or tonumber(ev.match) == self.list_win
+        or tonumber(ev.match) == self.preview_win
+        or tonumber(ev.match) == self.frame_win
+      then
         vim.schedule(function()
           self:close()
         end)
@@ -330,7 +447,7 @@ function Picker:_events()
     callback = function()
       vim.schedule(function()
         local win = api.nvim_get_current_win()
-        if not self.closed and win ~= self.input_win and win ~= self.list_win then
+        if not self.closed and win ~= self.input_win and win ~= self.list_win and win ~= self.preview_win then
           self:close()
         end
       end)
@@ -339,13 +456,30 @@ function Picker:_events()
   api.nvim_create_autocmd("VimResized", {
     group = self.group,
     callback = function()
-      local ok, input, list = pcall(self._layout, self)
+      local ok, resolved = pcall(self._layout, self)
       if not ok then
         self:close()
         return
       end
-      api.nvim_win_set_config(self.input_win, input)
-      api.nvim_win_set_config(self.list_win, list)
+      if self.preview_win and not resolved.preview then
+        local win = self.preview_win
+        self.preview_win = nil
+        self.preview:cancel()
+        api.nvim_win_close(win, true)
+      elseif resolved.preview and not self.preview_win then
+        self.preview_win = api.nvim_open_win(self.preview_buf, false, resolved.preview)
+        self.preview.initialized = false
+        vim.wo[self.preview_win].wrap = false
+        vim.wo[self.preview_win].list = false
+        vim.wo[self.preview_win].foldenable = false
+        vim.wo[self.preview_win].scrolloff = 0
+        vim.wo[self.preview_win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
+      end
+      for _, name in ipairs({ "frame", "input", "list", "preview" }) do
+        if resolved[name] then
+          api.nvim_win_set_config(self[name .. "_win"], resolved[name])
+        end
+      end
       self:_render()
     end,
   })
@@ -353,8 +487,8 @@ function Picker:_events()
     group = self.group,
     buffer = self.list_buf,
     callback = function()
-      local index = self.offset + api.nvim_win_get_cursor(self.list_win)[1]
-      if #self.matches > 0 and index ~= self.index then
+      local index = self.row_to_index[api.nvim_win_get_cursor(self.list_win)[1]]
+      if not self.rendering and index and index ~= self.index then
         self.index = index
         self:_render()
       end
@@ -368,16 +502,54 @@ function Picker:_events()
       self:close()
     end,
     next = function()
-      self:move(1)
+      self:move_visual(1)
     end,
     previous = function()
-      self:move(-1)
+      self:move_visual(-1)
     end,
   }
+  actions.select_previous = function()
+    self:toggle()
+    self:move(-1)
+  end
+  actions.select_next = function()
+    self:toggle()
+    self:move(1)
+  end
+  actions.history_back = function()
+    self:history_move(-1)
+  end
+  actions.history_forward = function()
+    self:history_move(1)
+  end
+  actions.preview_up = function()
+    self:scroll_preview(-1)
+  end
+  actions.preview_down = function()
+    self:scroll_preview(1)
+  end
+  actions.list_up = function()
+    self:scroll_list(-1)
+  end
+  actions.list_down = function()
+    self:scroll_list(1)
+  end
+  actions.copy = function()
+    require("selection_tools.actions").copy(self)
+  end
+  actions.system_open = function()
+    require("selection_tools.actions").open(self)
+  end
+  actions.ignore = function() end
+  for name, action in pairs(self.opts.actions or {}) do
+    actions[name] = function()
+      action(self)
+    end
+  end
   for action, keys in pairs(self.opts.keys) do
     assert(actions[action], "selection-tools: unknown key action: " .. action)
     for _, key in ipairs(keys) do
-      for _, buf in ipairs({ self.input_buf, self.list_buf }) do
+      for _, buf in ipairs({ self.input_buf, self.list_buf, self.preview_buf }) do
         vim.keymap.set({ "i", "n" }, key, actions[action], { buffer = buf, nowait = true, silent = true })
       end
     end
@@ -390,16 +562,33 @@ function Picker:_events()
   end, { buffer = self.list_buf })
 end
 
-function Picker:_mount(input, list)
+function Picker:_mount(resolved)
+  self.frame_buf = scratch("selection_tools_frame")
   self.input_buf, self.list_buf = scratch("selection_tools_input"), scratch("selection_tools_list")
   api.nvim_buf_set_lines(self.input_buf, 0, -1, false, { self.query })
-  self.list_win = api.nvim_open_win(self.list_buf, false, list)
-  self.input_win = api.nvim_open_win(self.input_buf, true, input)
-  for _, win in ipairs({ self.input_win, self.list_win }) do
-    vim.wo[win].wrap = false
-    vim.wo[win].cursorline = false
-    vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
-    vim.wo[win].scrolloff = 0
+  self.frame_win = api.nvim_open_win(self.frame_buf, false, resolved.frame)
+  self.list_win = api.nvim_open_win(self.list_buf, false, resolved.list)
+  if self.opts.preview.enabled then
+    self.preview_buf = scratch("selection_tools_preview")
+    -- A preview_item provider may temporarily display its own buffer in this pane.
+    vim.bo[self.preview_buf].bufhidden = "hide"
+    if resolved.preview then
+      self.preview_win = api.nvim_open_win(self.preview_buf, false, resolved.preview)
+    end
+    self.preview = require("selection_tools.preview").new(self, self.preview_buf)
+  end
+  self.input_win = api.nvim_open_win(self.input_buf, true, resolved.input)
+  for _, name in ipairs({ "frame", "list", "input", "preview" }) do
+    local win = self[name .. "_win"]
+    if win then
+      vim.wo[win].wrap = false
+      vim.wo[win].cursorline = false
+      vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
+      vim.wo[win].scrolloff = 0
+      vim.wo[win].sidescrolloff = 0
+      vim.wo[win].list = false
+      vim.wo[win].foldenable = false
+    end
   end
   api.nvim_set_hl(0, "SelectionToolsBorder", { default = true, link = "FloatBorder" })
   api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
@@ -426,8 +615,9 @@ function Picker.new(opts)
     index = 1,
     offset = 0,
     generation = 0,
+    marks = {},
   }, Picker)
-  local input, list = self:_layout()
+  local resolved = self:_layout()
   -- Validate formatting before opening windows or dismissing an existing picker.
   if opts.items then
     self:_set_items(opts.items)
@@ -435,8 +625,11 @@ function Picker.new(opts)
   if active then
     active:close()
   end
+  self.history_key = opts.source or opts.kind or opts.prompt or "select"
+  self.history = require("selection_tools.history").get(self.history_key, opts.history)
+  self.history_cursor, self.history_draft = #self.history + 1, self.query
   self.origin_win = api.nvim_get_current_win()
-  local ok, err = pcall(self._mount, self, input, list)
+  local ok, err = pcall(self._mount, self, resolved)
   if not ok then
     -- Failed construction has no selection lifecycle and must not leak UI.
     self.opts.on_choice = nil

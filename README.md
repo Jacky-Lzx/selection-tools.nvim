@@ -54,7 +54,43 @@ selection.files({ cwd = vim.fn.expand("~/project"), hidden = true, ignored = fal
 selection.buffers({ current = false }) -- 排除当前 buffer
 ```
 
-`cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。第一版聚焦于搜索与单项选择，暂未提供预览、多选和全文搜索。
+`cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；全文搜索暂未内置。
+
+## 窗口、预览与操作
+
+下面的配置对应纵向的 Snacks picker：上方预览占 60%，中间反向列表，下方输入框。整个窗口宽 80%、高 90%，使用一个外框和内部分隔线，不绘制遮罩。
+
+```lua
+require("selection_tools").setup({
+  ui_select = true,
+  layout = {
+    width = 0.8, min_width = 60, height = 0.9,
+    border = "rounded", title_pos = "center",
+    input_position = "bottom", reverse = true, preview_height = 0.6,
+  },
+  history = { persist = true, limit = 100 },
+  keys = {
+    next = { "<A-j>", "<C-n>", "<Down>" },
+    previous = { "<A-k>", "<C-p>", "<Up>" },
+    select_previous = { "<Tab>" },
+    select_next = { "<S-Tab>" },
+    history_back = { "<A-Up>" },
+    history_forward = { "<A-Down>" },
+    preview_up = { "<C-u>" }, preview_down = { "<C-d>" },
+    list_up = { "<A-u>" }, list_down = { "<A-d>" },
+    copy = { "<C-y>" }, system_open = { "<C-o>" },
+    ignore = { "<C-j>", "<C-k>" },
+  },
+})
+```
+
+`next` / `previous` 按屏幕方向移动；`select_previous` / `select_next` 标记当前项后按候选排名移动。多选标记在本地筛选时保留，替换候选列表时清除。文件确认会将标记文件加入 buffer 列表并显示第一个；没有标记时打开当前项。复制和系统打开都优先作用于标记项，否则作用于当前项，执行后保留搜索窗口。
+
+预览异步读取普通文件，带文件类型高亮；已加载 buffer 优先使用未保存内容。默认限制为 1 MiB、10000 行、每行 1000 字节；超大文件和二进制文件显示提示。切换条目和关闭窗口会使旧预览失效。预览滚动和列表翻页都保持搜索框焦点。
+
+`select()` / `vim.ui.select` 默认使用独立的紧凑布局：输入框在上、正向列表在下、宽度 50%（80–100 列，自动适应窄屏）、高度 40%。可用 `setup({ select = { layout = ... } })` 配置。若调用者提供 `preview_item`，则展示该回调返回的 buffer，并保留其高亮；插件不会修改或主动删除调用者的 buffer。
+
+查询历史按搜索源保存。默认只保存在会话内；启用 `history.persist` 后保存到 `stdpath("state")/selection-tools/history.json`，也可指定 `history.path`。向前浏览到末尾会恢复本次尚未提交的查询。
 
 ## 供其他插件调用
 
@@ -76,7 +112,7 @@ require("selection_tools").select(actions, {
 end)
 ```
 
-筛选后仍返回原始 Lua 对象和原列表索引；取消时回调收到 `nil, nil`。每个窗口只调用一次回调，调用前会清理窗口并恢复原窗口焦点。打开新 picker 会取消已有 picker。
+筛选后仍返回原始 Lua 对象和原列表索引；取消时回调收到 `nil, nil`。每个窗口只调用一次回调，调用前会清理窗口并恢复原窗口焦点。打开新 picker 会取消已有 picker。`open()` 可通过 `multi = true` 启用多选；确认回调的第三个参数是标记条目列表（没有标记时包含当前项），前两个参数仍是当前条目和索引。
 
 ### 注册搜索源
 
@@ -129,6 +165,8 @@ local picker = require("selection_tools").open({
 `ctx.set_items()` 替换候选列表；`ctx.done()` 结束加载；`ctx.fail(message)` 显示错误。这些方法可直接从异步回调调用。关闭窗口或更新 live 查询时，会执行 finder 返回的取消函数，旧请求结果会被丢弃。live 源每次重启会清空旧候选，避免确认到旧查询结果。
 
 返回的 picker 提供 `set_query(query)`、`set_items(items)`、`move(delta)`、`current()`、`confirm()` 和 `close()`。`current()` 返回当前条目及其原始索引；`close()` 表示取消。
+
+预览可由搜索源扩展：`preview = { enabled = true }` 开启预览，`previewer(ctx)` 接收 `item`、`index`、`buf`、`win`、`is_cancelled()` 和 `set_lines(lines, filetype, title, position)`。`set_lines` 可从异步回调调用；previewer 可返回取消函数。`actions = { name = function(picker) ... end }` 可定义额外操作，再通过 `keys.name` 配置按键。
 
 详见 `:help selection-tools`，包括配置、按键和完整 API。
 

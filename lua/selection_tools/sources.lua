@@ -4,6 +4,8 @@ function M.files(opts)
   local cwd = vim.fn.fnamemodify(opts.cwd or vim.fn.getcwd(), ":p")
   return {
     prompt = "Files",
+    multi = true,
+    preview = { enabled = true },
     cwd = cwd,
     format_item = function(item)
       return item.text
@@ -54,10 +56,16 @@ function M.files(opts)
         end
       end
     end,
-    on_choice = function(item)
+    on_choice = function(item, _, selected)
       if item then
         -- bufadd avoids Ex parsing for spaces, bars, percent signs and newlines.
-        vim.api.nvim_set_current_buf(vim.fn.bufadd(item.file))
+        local buffers = {}
+        for _, value in ipairs(selected or { item }) do
+          local buf = vim.fn.bufadd(value.file)
+          vim.bo[buf].buflisted = true
+          buffers[#buffers + 1] = buf
+        end
+        vim.api.nvim_set_current_buf(buffers[1])
       end
     end,
   }
@@ -86,6 +94,8 @@ function M.buffers(opts)
   end)
   return {
     prompt = "Buffers",
+    multi = true,
+    preview = { enabled = true },
     items = items,
     format_item = function(item)
       return item.text

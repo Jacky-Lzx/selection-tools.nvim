@@ -2,7 +2,22 @@ local M = {}
 
 local defaults = {
   ui_select = false,
-  layout = { width = 0.6, height = 0.5, border = "rounded" },
+  layout = {
+    width = 0.6,
+    height = 0.5,
+    border = "rounded",
+    title_pos = "center",
+    input_position = "top",
+    reverse = false,
+    preview_height = 0.6,
+  },
+  preview = { enabled = false, max_size = 1024 * 1024, max_lines = 10000, max_line_length = 1000 },
+  history = { limit = 100, persist = false },
+  select = {
+    layout = { width = 0.5, min_width = 80, max_width = 100, height = 0.4, input_position = "top", reverse = false },
+    preview = { enabled = false },
+    multi = false,
+  },
   keys = {
     confirm = { "<CR>" },
     close = { "<Esc>", "<C-c>" },
@@ -45,7 +60,11 @@ end
 function M.select(items, opts, on_choice)
   assert(type(items) == "table", "selection-tools: items must be a list")
   assert(type(on_choice) == "function", "selection-tools: on_choice must be a function")
-  opts = vim.tbl_extend("force", {}, opts or {}, { items = items, on_choice = on_choice })
+  opts = vim.tbl_deep_extend("force", {}, config.select, opts or {})
+  opts.items, opts.on_choice = items, on_choice
+  if opts.preview_item then
+    opts.preview.enabled = true
+  end
   return M.open(opts)
 end
 
@@ -78,7 +97,7 @@ function M.pick(name, opts)
   assert(source, "selection-tools: unknown source: " .. tostring(name))
   opts = opts or {}
   local spec = type(source) == "function" and source(opts) or source
-  return M.open(vim.tbl_deep_extend("force", {}, spec, opts))
+  return M.open(vim.tbl_deep_extend("force", {}, spec, opts, { source = name }))
 end
 
 function M.files(opts)

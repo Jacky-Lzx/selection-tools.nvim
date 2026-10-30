@@ -36,7 +36,34 @@ navigation and / to focus the search input in Insert mode.
 ui_select=true installs the |vim.ui.select()| adapter. Calling setup with false
 restores the previous implementation only if our adapter still owns the slot.
 Load the plugin before callers if you want it to handle vim.ui.select calls.
-Only the base select contract is implemented; preview_item is not supported.
+The adapter also supports preview_item and automatically enables its preview.
+
+Layout options: input_position ('top' or 'bottom'), reverse (false), min_width,
+max_width, preview_height (0.6) and title_pos ('center'). All panes share one
+outer border; there is no backdrop. Reverse places the first match at the bottom
+of the list. Movement keys follow screen directions, while move(delta) follows
+candidate rank. select.layout overrides the layout for select()/vim.ui.select;
+its default is a compact, forward list below an input at the top.
+
+Optional key actions (none are bound by default):
+  select_previous / select_next   Toggle mark, then move by rank -1 / +1.
+  history_back / history_forward  Browse source history, preserving the draft.
+  preview_up / preview_down       Scroll preview by half a window.
+  list_up / list_down             Move half a list window in screen direction.
+  copy                           Copy marked paths/text to the + register.
+  system_open                    Open marked paths/text with the system app.
+  ignore                         Consume a key without taking an action.
+
+These actions fall back to the current item if there are no marks. Copy/open
+leave the picker open. A custom system_open(path) callback may be supplied;
+it should return a success value and an optional error as its second result.
+actions = { name = function(picker) ... end } defines custom key actions.
+
+history = { limit = 100, persist = false } stores source-scoped query history.
+With persist=true, the default path is stdpath('state') followed by
+'/selection-tools/history.json'. Set history.path to override it. Writes are
+atomic, and empty queries are not recorded. Forward from the newest entry
+restores the query that was being edited before browsing history.
 
 Highlight groups (all use default links and may be overridden):
   SelectionToolsBorder       FloatBorder
@@ -63,8 +90,9 @@ with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
 cancels the old one. Leaving the picker windows cancels it. External window
 closure and input buffer destruction also clean up the picker.
 
-This version supports single selection. Preview, multiple selection, and live
-grep are not included.
+File/buffer sources enable preview and multiple selection. Marked files are
+added to the buffer list; confirmation displays the first marked file.
+Live grep is not included.
 
 ===============================================================================
 3. PUBLIC API                                           *selection-tools-api*
@@ -91,6 +119,25 @@ selection.open(opts)
                      a live source already filters/sorts candidates.
       cwd            Source context cwd; default current directory.
       layout, keys   Per-call overrides of setup options.
+      multi          Enable marks; default false, true for files/buffers.
+      preview        { enabled=false, max_size=1048576, max_lines=10000,
+                       max_line_length=1000 }. Built-in sources enable it.
+      preview_item   vim.ui.select-style function(item) returning a buffer
+                     and optional pos. Caller buffers are displayed directly
+                     without changing their options or deleting them.
+      previewer      Custom function(ctx), optionally returning a cancel
+                     function. ctx contains item, index, buf, win,
+                     is_cancelled(), set_lines(lines, ft, title, pos).
+                     set_lines is safe from async callbacks. Late results
+                     are ignored. The built-in previewer reads files
+                     asynchronously and prefers unsaved loaded buffers.
+
+With multi=true, on_choice receives marked items as an additional third
+argument; with no marks it contains the current item. The first two arguments
+still identify the current item. Cancellation does not return marked items.
+Marks survive local filtering but are cleared when the source replaces items.
+Binary and oversized files show an explanatory preview message. Preview
+scrolling preserves the input focus; preview never edits source buffers.
 
 selection.register_source(name, source)
     Register or replace a source (including a built-in). Name must contain
@@ -140,6 +187,13 @@ uses text only; Lua objects/functions are never passed through Vimscript.
 picker:set_query(query)    Replace input and refresh filtering/search.
 picker:set_items(items)    Replace candidates and refresh filtering.
 picker:move(delta)         Move selection, wrapping at either end.
+picker:move_visual(delta)  Move in screen directions, respecting reverse.
+picker:toggle()            Toggle a mark on the current item if multi=true.
+picker:selected(opts)      Marked values in source order. opts.fallback=true
+                          falls back to the current item if there are no marks.
+picker:history_move(delta) Browse previous (-1) or next (+1) query.
+picker:scroll_list(dir)    Half-window list movement, -1 up / +1 down.
+picker:scroll_preview(dir) Half-window preview scroll, -1 up / +1 down.
 picker:current()           Return item, original_index; nils with no selection.
 picker:confirm()           Close and choose current item; no-op without matches.
 picker:close()             Cancel. Repeated close calls are harmless.

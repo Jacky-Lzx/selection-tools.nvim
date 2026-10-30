@@ -336,6 +336,242 @@ test("invalid border and key configuration do not leak buffers or windows", func
   eq(calls, 0)
 end)
 
+test("vertical reversed layout keeps the best match next to the bottom input", function()
+  local items = {}
+  for i = 1, 80 do
+    items[i] = ("item %02d"):format(i)
+  end
+  local p = tools.open({
+    items = items,
+    multi = true,
+    preview = { enabled = true },
+    layout = { width = 0.8, height = 0.9, min_width = 60, input_position = "bottom", reverse = true },
+  })
+  local preview = vim.api.nvim_win_get_position(p.preview_win)
+  local list = vim.api.nvim_win_get_position(p.list_win)
+  local input = vim.api.nvim_win_get_position(p.input_win)
+  assert(preview[1] < list[1] and list[1] < input[1])
+  eq(vim.api.nvim_win_get_cursor(p.list_win)[1], p.height)
+  p:move_visual(-1)
+  eq(p.index, 2)
+  eq(vim.api.nvim_win_get_cursor(p.list_win)[1], p.height - 1)
+  p:scroll_list(-1)
+  assert(p.index > 2)
+  p:scroll_list(1)
+  eq(p.index, 2)
+  vim.api.nvim_exec_autocmds("VimResized", {})
+  assert(not p.closed)
+  p:close()
+  assert(not vim.api.nvim_win_is_valid(p.frame_win))
+  assert(not vim.api.nvim_win_is_valid(p.preview_win))
+  assert(not vim.api.nvim_buf_is_valid(p.preview_buf))
+end)
+
+test("multiselection survives filtering and preserves object identity", function()
+  local a, b = { text = "alpha" }, { text = "beta" }
+  local chosen
+  local p = tools.open({
+    items = { a, b },
+    multi = true,
+    format_item = function(item)
+      return item.text
+    end,
+    on_choice = function(item, index, selected)
+      chosen = { item, index, selected }
+    end,
+  })
+  p:toggle()
+  p:set_query("beta")
+  p:toggle()
+  local selected = p:selected()
+  assert(selected[1] == a and selected[2] == b)
+  p:confirm()
+  assert(chosen[1] == b and chosen[2] == 2 and chosen[3][1] == a and chosen[3][2] == b)
+end)
+
+test("short-screen resizing hides and restores preview without losing the query", function()
+  local lines = vim.o.lines
+  local p = tools.open({ items = { "match" }, query = "mat", preview = { enabled = true }, layout = { height = 0.9 } })
+  local ok, err = pcall(function()
+    assert(p.preview_win)
+    vim.o.lines = 9
+    vim.api.nvim_exec_autocmds("VimResized", {})
+    drain()
+    assert(not p.closed and not p.preview_win)
+    eq(p.query, "mat")
+    vim.o.lines = lines
+    vim.api.nvim_exec_autocmds("VimResized", {})
+    assert(p.preview_win and not p.closed)
+    eq(p:current(), "match")
+  end)
+  vim.o.lines = lines
+  p:close()
+  assert(ok, err)
+end)
+
+test("file preview is asynchronous, highlighted and does not create a file buffer", function()
+  local path = fixture .. "/preview.lua"
+  vim.fn.writefile({ "local value = 1", "return value" }, path)
+  local before = vim.api.nvim_get_current_buf()
+  local p = tools.files({ cwd = fixture, query = "preview.lua" })
+  assert(vim.wait(5000, function()
+    return not p.loading and vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1] == "local value = 1"
+  end, 5))
+  eq(vim.bo[p.preview_buf].filetype, "lua")
+  eq(vim.fn.bufnr(path), -1)
+  eq(vim.api.nvim_get_current_win(), p.input_win)
+  p:close()
+  eq(vim.api.nvim_get_current_buf(), before)
+end)
+
+test("buffer preview shows unsaved text without modifying the source buffer", function()
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_name(buf, fixture .. "/dirty-buffer.lua")
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "unsaved contents" })
+  local tick = vim.api.nvim_buf_get_changedtick(buf)
+  local p = tools.buffers({ query = "dirty-buffer" })
+  eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false), { "unsaved contents" })
+  p:close()
+  assert(vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified)
+  eq(vim.api.nvim_buf_get_changedtick(buf), tick)
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
+test("preview scroll preserves input focus and file limits are visible", function()
+  local lines = {}
+  for i = 1, 100 do
+    lines[i] = "line " .. i
+  end
+  vim.fn.writefile(lines, fixture .. "/scroll.txt")
+  local p = tools.files({ cwd = fixture, query = "scroll.txt" })
+  assert(vim.wait(5000, function()
+    return vim.api.nvim_buf_line_count(p.preview_buf) == 100
+  end, 5))
+  p:scroll_preview(1)
+  assert(vim.api.nvim_win_get_cursor(p.preview_win)[1] > 1)
+  eq(vim.api.nvim_get_current_win(), p.input_win)
+  p:scroll_preview(-1)
+  p:close()
+  p = tools.files({ cwd = fixture, query = "scroll.txt", preview = { max_size = 4 } })
+  assert(vim.wait(5000, function()
+    return vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1]:find("too large") ~= nil
+  end, 5))
+  p:close()
+  local file = assert(io.open(fixture .. "/binary.bin", "wb"))
+  file:write("a\0b")
+  file:close()
+  p = tools.files({ cwd = fixture, query = "binary.bin" })
+  assert(vim.wait(5000, function()
+    return vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1]:find("Binary file") ~= nil
+  end, 5))
+  p:close()
+end)
+
+test("late preview callbacks cannot overwrite a newer item or a closed picker", function()
+  local requests, cancelled = {}, 0
+  local p = tools.open({
+    items = { "old", "new" },
+    preview = { enabled = true },
+    previewer = function(ctx)
+      requests[#requests + 1] = ctx
+      return function()
+        cancelled = cancelled + 1
+      end
+    end,
+  })
+  p:move(1)
+  requests[2].set_lines({ "new contents" })
+  requests[1].set_lines({ "old contents" })
+  drain()
+  eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false), { "new contents" })
+  assert(requests[1].is_cancelled())
+  p:close()
+  eq(cancelled, 2)
+  requests[2].set_lines({ "late contents" })
+  drain()
+end)
+
+test("ui.select preview_item preserves external buffer ownership and highlights", function()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "first", "second" })
+  local ns = vim.api.nvim_create_namespace("fixture_preview")
+  vim.api.nvim_buf_set_extmark(buf, ns, 1, 0, { end_col = 3, hl_group = "Search" })
+  local p = tools.select({ "value" }, {
+    preview_item = function()
+      return { buf = buf, pos = { 2, 1 } }
+    end,
+  }, function() end)
+  eq(vim.api.nvim_win_get_buf(p.preview_win), buf)
+  eq(vim.api.nvim_win_get_cursor(p.preview_win), { 2, 1 })
+  p:close()
+  assert(vim.api.nvim_buf_is_valid(buf))
+  eq(#vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, {}), 1)
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
+test("history is source-scoped, restores the draft, and persists when requested", function()
+  local opts = {
+    items = { "alpha", "beta" },
+    source = "history_fixture",
+    history = { persist = true, path = fixture .. "/history/history.json", limit = 2 },
+  }
+  local p = tools.open(opts)
+  p:set_query("alpha")
+  p:close()
+  p = tools.open(opts)
+  p:set_query("beta")
+  p:close()
+  p = tools.open(opts)
+  p:set_query("draft")
+  p:history_move(-1)
+  eq(p.query, "beta")
+  p:history_move(-1)
+  eq(p.query, "alpha")
+  p:history_move(1)
+  p:history_move(1)
+  eq(p.query, "draft")
+  p:close()
+  local saved = vim.json.decode(table.concat(vim.fn.readfile(opts.history.path), "\n"))
+  eq(saved.history_fixture, { "beta", "draft" })
+  opts.source = "other_history"
+  p = tools.open(opts)
+  p:history_move(-1)
+  eq(p.query, "")
+  p:close()
+end)
+
+test("copy and system-open use all marked paths without closing the picker", function()
+  local a, b = { file = "first path" }, { file = "second path" }
+  local opened, copied = {}, nil
+  local p = tools.open({
+    items = { a, b },
+    multi = true,
+    format_item = function(item)
+      return item.file
+    end,
+    system_open = function(path)
+      opened[#opened + 1] = path
+      return true
+    end,
+  })
+  p:toggle()
+  p:move(1)
+  p:toggle()
+  local setreg = vim.fn.setreg
+  vim.fn.setreg = function(register, value)
+    eq(register, "+")
+    copied = value
+  end
+  local ok, err = pcall(require("selection_tools.actions").copy, p)
+  vim.fn.setreg = setreg
+  assert(ok, err)
+  eq(copied, "first path\nsecond path")
+  require("selection_tools.actions").open(p)
+  eq(opened, { "first path", "second path" })
+  assert(not p.closed)
+  p:close()
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then
