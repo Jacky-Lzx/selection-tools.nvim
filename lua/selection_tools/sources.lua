@@ -19,6 +19,7 @@ local M = {
     "keymaps",
     "help",
     "man",
+    "spelling",
   },
 }
 
