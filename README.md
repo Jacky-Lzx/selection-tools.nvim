@@ -214,6 +214,8 @@ local picker = require("selection_tools").open({
 
 `ctx.set_items()` 替换候选列表；`ctx.done()` 结束加载；`ctx.fail(message)` 显示错误。这些方法可直接从异步回调调用。关闭窗口或更新 live 查询时，会执行 finder 返回的取消函数，旧请求结果会被丢弃。live 源每次重启会清空旧候选，避免确认到旧查询结果。
 
+搜索源可通过 `highlight_item(item, original_index)` 返回 `{{start_byte, end_byte}, ...}`，为格式化条目的指定范围使用 `SelectionToolsMatch` 高亮。范围基于 `format_item` 返回的原始字符串，使用从 0 开始、右侧不包含的字节偏移；图标、多选标记和 Tab 等控制字符的显示转换由渲染器处理。回调仅对可见候选调用，结果缓存到候选被替换。grep 使用 ripgrep 返回的真实命中范围，不重新解释正则或进行模糊匹配。
+
 返回的 picker 提供 `set_query(query)`、`set_items(items)`、`move(delta)`、`current()`、`confirm()` 和 `close()`。`current()` 返回当前条目及其原始索引；`close()` 表示取消。
 
 预览可由搜索源扩展：`preview = { enabled = true }` 开启预览，`previewer(ctx)` 接收 `item`、`index`、`buf`、`win`、`is_cancelled()` 和 `set_lines(lines, filetype, title, position)`。`set_lines` 可从异步回调调用；previewer 可返回取消函数。`actions = { name = function(picker) ... end }` 可定义额外操作，再通过 `keys.name` 配置按键。
@@ -235,7 +237,7 @@ python3 tests/tui.py
 
 ## 内置搜索源
 
-- `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转，空查询不扫描目录。
+- `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转；列表高亮每行全部实际命中范围，支持字面搜索和正则匹配，空查询不扫描目录。
 
 - `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
 

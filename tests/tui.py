@@ -34,6 +34,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "grep_tui":
+            actions.update(type=b"hel")
         if case == "match_tui":
             actions.update(type=b"png")
         if case == "item_icons_tui":
@@ -81,6 +83,7 @@ if __name__ == "__main__":
     run_case("lazy_tui")
     run_case("item_icons_tui")
     run_case("match_tui")
+    run_case("grep_tui")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:

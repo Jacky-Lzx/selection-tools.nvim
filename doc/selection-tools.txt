@@ -112,6 +112,8 @@ added to the buffer list; confirmation displays the first marked file.
 The grep source performs live full-text search using ripgrep JSON output.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
+Every nonempty ripgrep submatch is highlighted in the result label, including
+multiple hits per line and regex matches. Matches in the filename are excluded.
 Confirming a result opens its exact file/line/column; an empty query does not
 start a search.
 
@@ -131,6 +133,12 @@ selection.open(opts)
     Open a picker with items or finder. Returns a picker. Options:
       items          Candidate list.
       format_item    Searchable label: fun(item): string.
+      highlight_item Optional fun(item, original_index): {{start_byte,end_byte}}.
+                     Zero-based, end-exclusive byte ranges in format_item's
+                     output. Uses SelectionToolsMatch, independently of local
+                     matching. Only visible entries resolve and cache ranges;
+                     replacing candidates resets the cache. Icons/marks and
+                     escaped control bytes are accounted for by the renderer.
       item_icons     { enabled=true }. false or { enabled=false } disables
                      automatic and custom item icons.
       format_icon    Optional fun(item, original_index): glyph, highlight_group.

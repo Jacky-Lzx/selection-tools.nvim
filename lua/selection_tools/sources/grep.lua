@@ -9,6 +9,9 @@ return function(opts)
     multi = true,
     preview = { enabled = true },
     format_item = util.format,
+    highlight_item = function(item)
+      return item.match_ranges
+    end,
     finder = function(ctx)
       if ctx.query == "" then
         ctx.set_items({})

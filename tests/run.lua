@@ -97,6 +97,59 @@ test("Unicode, fuzzy positions, wrapping and empty results", function()
   p:close()
 end)
 
+test("source byte ranges are lazy and stay aligned after controls, Unicode and icons", function()
+  local raw = "head\t中文\r\0\nneedle"
+  local start = assert(raw:find("needle", 1, true)) - 1
+  local calls = 0
+  local items = {}
+  for i = 1, 1000 do
+    items[i] = { text = raw }
+  end
+  local p = tools.open({
+    items = items,
+    multi = true,
+    format_item = function(item)
+      return item.text
+    end,
+    format_icon = function()
+      return "🦀", "Special"
+    end,
+    highlight_item = function()
+      calls = calls + 1
+      return { { start, start + #"needle" }, { start, start } }
+    end,
+  })
+  eq(calls, p.height)
+  local marks = vim.tbl_filter(function(mark)
+    return mark[4].hl_group == "SelectionToolsMatch"
+  end, vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true }))
+  eq(#marks, p.height)
+  for _, mark in ipairs(marks) do
+    local line = vim.api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
+    eq(line:sub(mark[3] + 1, mark[4].end_col), "needle")
+  end
+  p:_render()
+  eq(calls, p.height)
+  p:set_query("absent")
+  eq(#p.matches, 0)
+  p:close()
+end)
+
+test("item highlighter failures leave the picker usable and warn only once", function()
+  local before = #notifications
+  local p = tools.open({
+    items = { "alpha", "beta" },
+    highlight_item = function()
+      error("bad highlighter")
+    end,
+  })
+  eq(#notifications, before + 1)
+  p:set_query("beta")
+  eq(p:current(), "beta")
+  eq(#notifications, before + 1)
+  p:close()
+end)
+
 test("buffer changes update filtering and normalize pasted newlines", function()
   local p = tools.select({ "alpha", "beta", "alpha beta" }, {}, function() end)
   vim.api.nvim_buf_set_lines(p.input_buf, 0, -1, false, { "beta" })

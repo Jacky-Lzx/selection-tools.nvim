@@ -48,7 +48,10 @@ test("highlight attributes are read only for the previewed item and reflect curr
   local get_hl, calls = vim.api.nvim_get_hl, {}
   vim.api.nvim_set_hl(0, "SelectionLazyHighlight", { fg = "#123456" })
   vim.api.nvim_get_hl = function(ns, opts)
-    calls[#calls + 1] = opts.name
+    -- Picker chrome resolves its count color separately from source attributes.
+    if opts.name ~= "SelectionToolsCount" and opts.name ~= "Comment" then
+      calls[#calls + 1] = opts.name
+    end
     return get_hl(ns, opts)
   end
   local ok, err = xpcall(function()

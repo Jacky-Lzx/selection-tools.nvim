@@ -50,12 +50,60 @@ test("live grep handles literal text, unusual paths, preview positions and stale
   eq(#p.entries, 1)
   eq(p:current().pos, { 2, 7 })
   eq(p:current().file, path)
+  local hits = vim.tbl_filter(function(mark)
+    return mark[4].hl_group == "SelectionToolsMatch"
+  end, vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true }))
+  eq(#hits, 1)
+  local hit = hits[1]
+  local label = vim.api.nvim_buf_get_lines(p.list_buf, hit[2], hit[2] + 1, false)[1]
+  eq(label:sub(hit[3] + 1, hit[4].end_col), "needle[1]")
   p:confirm()
   eq(vim.api.nvim_buf_get_name(0), vim.uv.fs_realpath(path))
   eq(vim.api.nvim_win_get_cursor(0), { 2, 7 })
   p = tools.grep({ cwd = fixture, query = "^prefix", regex = true, debounce_ms = 0 })
   ready(p)
   eq(#p.entries, 1)
+  p:close()
+end)
+
+test("grep highlights all regex hits with Unicode and tabs, then clears stale ranges", function()
+  local directory = fixture .. "/grep-highlights"
+  vim.fn.mkdir(directory, "p")
+  local path = directory .. "/help\t中文.rs"
+  vim.fn.writefile({ "\t中文 heldout_phase0 + help + heldout_phase1", "\t中文 help + heldout_phase2" }, path)
+  local p = tools.grep({
+    cwd = directory,
+    query = "heldout_phase[0-9]|help",
+    regex = true,
+    debounce_ms = 0,
+    preview = { enabled = false },
+    layout = { reverse = true },
+  })
+  ready(p)
+  eq(#p.matches, 2)
+  local actual = {}
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })) do
+    if mark[4].hl_group == "SelectionToolsMatch" then
+      local line = vim.api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
+      local index = p.row_to_index[mark[2] + 1]
+      local item = p.matches[index].item
+      local list = actual[item.pos[1]] or {}
+      actual[item.pos[1]] = list
+      list[#list + 1] = line:sub(mark[3] + 1, mark[4].end_col)
+      -- A matching word in the filename must not be highlighted as a content hit.
+      assert(mark[3] >= assert(line:find("中文 heldout", 1, true) or line:find("中文 help", 1, true)) - 1)
+    end
+  end
+  eq(actual, { { "heldout_phase0", "help", "heldout_phase1" }, { "help", "heldout_phase2" } })
+  p:set_query("missing")
+  ready(p)
+  eq(#p.matches, 0)
+  p:set_query("^")
+  ready(p)
+  eq(#p.matches, 2)
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })) do
+    assert(mark[4].hl_group ~= "SelectionToolsMatch", "zero-width match highlighted unrelated text")
+  end
   p:close()
 end)
 

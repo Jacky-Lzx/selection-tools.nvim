@@ -137,7 +137,14 @@ function Picker:_set_items(items)
   local entries = {}
   for index, item in ipairs(items) do
     local text = self.opts.format_item and self.opts.format_item(item) or tostring(item)
-    entries[index] = { item = item, index = index, text = single_line(text) }
+    local raw = tostring(text)
+    local display = single_line(raw)
+    entries[index] = {
+      item = item,
+      index = index,
+      text = display,
+      raw_text = self.opts.highlight_item and raw ~= display and raw or nil,
+    }
   end
   self.entries, self.marks = entries, {}
   self.matcher:set_entries(entries)
@@ -193,6 +200,54 @@ function Picker:_icon(entry)
     self.icon_resolver = require("selection_tools.item_icons").new(self.opts)
   end
   return self.icon_resolver(entry)
+end
+
+-- Source ranges use zero-based byte offsets in the formatted label. Resolve only
+-- visible entries and account for the renderer escaping tabs and control bytes.
+function Picker:_highlights(entry)
+  if entry.highlights then
+    return entry.highlights
+  end
+  entry.highlights = {}
+  if not self.opts.highlight_item then
+    return entry.highlights
+  end
+  local ok, ranges = pcall(self.opts.highlight_item, entry.item, entry.index)
+  if not ok then
+    if not self.highlight_warned then
+      self.highlight_warned = true
+      vim.notify("selection-tools: item highlighter failed: " .. tostring(ranges), vim.log.levels.WARN)
+    end
+    return entry.highlights
+  end
+  local raw = entry.raw_text or entry.text
+  local boundaries = {}
+  for _, range in ipairs(type(ranges) == "table" and ranges or {}) do
+    if type(range) == "table" and type(range[1]) == "number" and type(range[2]) == "number" then
+      local first = math.max(0, math.min(#raw, math.floor(range[1])))
+      local last = math.max(0, math.min(#raw, math.floor(range[2])))
+      if first < last then
+        entry.highlights[#entry.highlights + 1] = { first, last }
+        boundaries[first], boundaries[last] = first, last
+      end
+    end
+  end
+  if entry.raw_text then
+    local offsets = vim.tbl_keys(boundaries)
+    table.sort(offsets)
+    local controls = raw:gmatch("()[\r\n\t%z]")
+    local next_control, added = controls(), 0
+    for _, offset in ipairs(offsets) do
+      while next_control and next_control <= offset do
+        added, next_control = added + 1, controls()
+      end
+      boundaries[offset] = offset + added
+    end
+    for _, range in ipairs(entry.highlights) do
+      range[1], range[2] = boundaries[range[1]], boundaries[range[2]]
+    end
+  end
+  return entry.highlights
 end
 
 function Picker:_render()
@@ -258,6 +313,13 @@ function Picker:_render()
         -- Only visible rows need highlight positions from the native matcher.
         self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
           or {}
+      end
+      for _, range in ipairs(self:_highlights(self.matches[index])) do
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, prefixes[row] + range[1], {
+          end_col = prefixes[row] + range[2],
+          hl_group = "SelectionToolsMatch",
+          priority = 110,
+        })
       end
       for _, pos in ipairs(self.positions[index] or {}) do
         local start = vim.fn.byteidx(self.matches[index].text, pos) + prefixes[row]
@@ -800,6 +862,10 @@ function Picker:_mount(resolved)
 end
 
 function Picker.new(opts)
+  assert(
+    opts.highlight_item == nil or type(opts.highlight_item) == "function",
+    "selection-tools: highlight_item must be a function"
+  )
   assert(
     opts.format_icon == nil or type(opts.format_icon) == "function",
     "selection-tools: format_icon must be a function"
