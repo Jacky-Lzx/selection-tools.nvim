@@ -45,7 +45,8 @@ local function check()
   do
     if location[4].hl_group == "SelectionToolsFileLocation" then
       file = location[3]
-      assert(location[4].end_col == #label)
+      local display = p.matches[p.index].grep_render
+      assert(location[4].end_col == (display.icon and display.icon.first - 1 or #label))
     end
   end
   assert(file and vim.fn.strwidth(label) == p.resolved.width, "File column is not right aligned")

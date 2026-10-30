@@ -319,16 +319,17 @@ function Picker:_render()
       icon_width = math.max(icon_width, vim.fn.strdisplaywidth(icon.text))
     end
     if columns then
-      wanted_file =
-        math.max(wanted_file, columns.info(entry).width + (icon and vim.fn.strdisplaywidth(icon.text) + 1 or 0))
+      wanted_file = math.max(wanted_file, columns.info(entry).width)
     end
   end
+  wanted_file = wanted_file + (icon_width > 0 and icon_width + 1 or 0)
   local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
     local prefix = self.opts.multi and (self.marks[entry.index] and "*" or " ") or ""
     if columns then
-      rows[row] = columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], self:_highlights(entry))
+      rows[row] =
+        columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], self:_highlights(entry), icon_width)
     else
       if icon_width > 0 then
         local glyph = icons[row] and icons[row].text or ""

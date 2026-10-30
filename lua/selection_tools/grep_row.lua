@@ -99,9 +99,20 @@ local function snippet(code, cells, focus, focus_end)
   local body = keep(rest, math.max(0, remaining - width(trailing)), false)
   return leading .. body .. trailing, start, start + #body, #leading
 end
-function M.render(entry, cells, file_cells, mark, icon, matches)
+function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
   local info = M.info(entry)
-  local key = cells .. ":" .. file_cells .. ":" .. mark .. ":" .. (icon and icon.text or "") .. ":" .. vim.o.ambiwidth
+  icon_width = icon_width or (icon and width(icon.text) or 0)
+  local key = cells
+    .. ":"
+    .. file_cells
+    .. ":"
+    .. mark
+    .. ":"
+    .. (icon and icon.text or "")
+    .. ":"
+    .. icon_width
+    .. ":"
+    .. vim.o.ambiwidth
   if entry.grep_render_key == key then
     return entry.grep_render
   end
@@ -119,10 +130,10 @@ function M.render(entry, cells, file_cells, mark, icon, matches)
   local code, first, last, leading = snippet(info.code, code_cells, focus, focus_end)
   local result = { text = mark .. code, segments = { { info.offset + first, info.offset + last, #mark + leading } } }
   if file_cells > 0 then
-    local glyph = file_cells >= 10 and icon and icon.text or ""
-    local icon_cells = glyph ~= "" and width(glyph) + 1 or 0
+    local glyph = icon and icon.text or ""
+    local icon_cells = file_cells >= 10 and icon_width > 0 and icon_width + 1 or 0
     if file_cells - icon_cells < 4 then
-      glyph, icon_cells = "", 0
+      icon_cells = 0
     end
     local path_cells = file_cells - icon_cells
     local name
@@ -133,12 +144,15 @@ function M.render(entry, cells, file_cells, mark, icon, matches)
     end
     local pad = code_cells - width(code) + gap + file_cells - width(name) - icon_cells
     result.text = result.text .. string.rep(" ", math.max(0, pad))
-    if glyph ~= "" then
-      result.icon = { first = #result.text, last = #result.text + #glyph, hl = icon.hl }
-      result.text = result.text .. glyph .. " "
-    end
     result.file = { #result.text, #result.text + #name }
     result.text = result.text .. name
+    if icon_cells > 0 then
+      result.text = result.text .. " "
+      if glyph ~= "" then
+        result.icon = { first = #result.text, last = #result.text + #glyph, hl = icon.hl }
+      end
+      result.text = result.text .. glyph .. string.rep(" ", icon_width - width(glyph))
+    end
   end
   entry.grep_render_key, entry.grep_render = key, result
   return result

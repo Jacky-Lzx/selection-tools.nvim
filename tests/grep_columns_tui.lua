@@ -34,11 +34,16 @@ local function check()
   local cell = left + vim.fn.strwidth(line:sub(1, hit[3])) + 1
   assert(vim.fn.screenstring(top + row, cell) == "n", "Hit is not visible on screen")
   if p.resolved.width - 1 >= 18 then
-    assert(location and location[4].end_col == #line and vim.fn.strwidth(line) == p.resolved.width)
+    local icon = p.matches[p.index].grep_render.icon
+    assert(location and location[4].end_col == (icon and icon.first - 1 or #line))
+    assert(vim.fn.strwidth(line) == p.resolved.width)
+    if icon then
+      assert(icon.last == #line, "Icon is not flush right")
+    end
     assert(hit[4].end_col <= location[3], "Code overlaps the file column")
     local hl = vim.api.nvim_get_hl(0, { name = "SelectionToolsFileLocation", link = false })
     assert(hl.fg == 0x888888, "File column is not muted gray")
-    assert(vim.fn.screenstring(top + row, left + p.resolved.width) ~= " ", "Filename is not flush right")
+    assert(vim.fn.screenstring(top + row, left + p.resolved.width) ~= " ", "File column is not flush right")
   else
     assert(not location, "Tiny window should prioritize code")
   end

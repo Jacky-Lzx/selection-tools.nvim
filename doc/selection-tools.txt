@@ -115,7 +115,8 @@ The grep source performs live full-text search using ripgrep JSON output.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
 Grep defaults to result_layout="grep": code is left-aligned and file locations
-are right-aligned, with the file icon beside the path. SelectionToolsFileLocation
+are right-aligned, followed by a fixed-width icon column. Icons align across
+rows, including mixed-width glyphs. SelectionToolsFileLocation
 uses the Comment foreground without italics. Code indentation is trimmed for
 display; long code is clipped around the first hit. Long paths use a leading
 ellipsis to retain the filename. Widths use terminal cells and preserve composed

@@ -42,10 +42,13 @@ local function grouped(p, group)
   end, vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true }))
 end
 
-test("code is left aligned while muted file locations end at the right edge", function()
+test("code is left aligned with muted filenames and aligned trailing icons", function()
   vim.fn.writefile({ '    local needle = "value"' }, fixture .. "/one.lua")
   vim.fn.writefile({ '\treturn "needle"' }, fixture .. "/two.lua")
   local p = tools.grep({
+    format_icon = function(item)
+      return item.display_file == "one.lua" and "L" or "🦀", "Special"
+    end,
     cwd = fixture,
     query = "needle",
     debounce_ms = 0,
@@ -57,10 +60,16 @@ test("code is left aligned while muted file locations end at the right edge", fu
   ready(p)
   local locations = grouped(p, "SelectionToolsFileLocation")
   eq(#locations, 2)
+  local icon_column
   for _, mark in ipairs(locations) do
     local label = vim.api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
     eq(vim.fn.strwidth(label), p.resolved.width)
-    eq(mark[4].end_col, #label)
+    local icon = p.matches[p.row_to_index[mark[2] + 1]].grep_render.icon
+    assert(icon and mark[4].end_col + 1 == icon.first)
+    local cell = vim.fn.strwidth(label:sub(1, icon.first))
+    icon_column = icon_column or cell
+    eq(cell, icon_column)
+    eq(cell, p.resolved.width - 2)
     local name = label:sub(mark[3] + 1, mark[4].end_col)
     assert(name:match("%.lua:1:%d+$"))
     assert(label:match("^ local") or label:match("^ return"))
@@ -104,7 +113,12 @@ test("Unicode truncation respects cell budgets and composed character boundaries
         assert(valid, "invalid UTF-8")
         if display.file then
           eq(vim.fn.strwidth(display.text), cells)
-          eq(display.file[2], #display.text)
+          if display.icon then
+            eq(display.file[2] + 1, display.icon.first)
+            eq(display.icon.last, #display.text)
+          else
+            eq(display.file[2], #display.text)
+          end
           assert(not display.text:sub(display.file[1] + 1):match("^́"), "orphan combining mark")
         end
         for _, segment in ipairs(display.segments) do
