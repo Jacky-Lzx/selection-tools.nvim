@@ -59,6 +59,32 @@ test("live grep handles literal text, unusual paths, preview positions and stale
   p:close()
 end)
 
+test("projects combine explicit, recent and discovered roots without duplicates", function()
+  local cwd, oldfiles = vim.fn.getcwd(), vim.v.oldfiles
+  vim.fn.mkdir(fixture .. "/work/one/.git", "p")
+  vim.fn.mkdir(fixture .. "/work/two/.git", "p")
+  vim.fn.writefile({ "one" }, fixture .. "/work/one/file.txt")
+  vim.v.oldfiles = { fixture .. "/work/one/file.txt" }
+  local ok, err = pcall(function()
+    local p =
+      tools.projects({ projects = { fixture .. "/work/one" }, dev = { fixture .. "/work" }, open_files = false })
+    local count = 0
+    for _, entry in ipairs(p.entries) do
+      if entry.item.dir == vim.uv.fs_realpath(fixture .. "/work/one") then
+        count = count + 1
+      end
+    end
+    eq(count, 1)
+    p:set_query("work/two")
+    eq(#p.matches, 1)
+    p:confirm()
+    eq(vim.fn.getcwd(), vim.uv.fs_realpath(fixture .. "/work/two"))
+  end)
+  vim.api.nvim_set_current_dir(cwd)
+  vim.v.oldfiles = oldfiles
+  assert(ok, err)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

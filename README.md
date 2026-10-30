@@ -211,3 +211,5 @@ python3 tests/tui.py
 - `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转，空查询不扫描目录。
 
 新增搜索源测试：`nvim --headless -u NONE -n -i NONE -l tests/sources.lua`。
+
+- `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
