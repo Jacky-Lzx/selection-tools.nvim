@@ -9,9 +9,11 @@ return function(opts)
     for name, cmd in pairs(commands) do
       by_name[name] = {
         name = name,
+        key = name,
         text = name .. "  " .. scope .. "  " .. (cmd.definition or ""),
         ft = "vim",
-        detail = vim.inspect(vim.tbl_extend("force", { scope = scope }, cmd)),
+        command = cmd,
+        scope = scope,
       }
     end
   end
@@ -27,7 +29,13 @@ return function(opts)
     resume_refresh = true,
     format_item = util.format,
     preview = { enabled = true },
-    previewer = util.preview,
+    previewer = function(ctx)
+      local item = ctx.item
+      if not item.detail then
+        item.detail = vim.inspect(vim.tbl_extend("force", { scope = item.scope }, item.command))
+      end
+      util.preview(ctx)
+    end,
     on_choice = function(item)
       if item then
         util.context(origin, function()

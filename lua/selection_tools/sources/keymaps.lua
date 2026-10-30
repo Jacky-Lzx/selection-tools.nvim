@@ -1,14 +1,25 @@
 local util = require("selection_tools.sources.util")
 return function(opts)
   local origin, maps = util.capture(), {}
+  local definition = util.definitions()
+  local function describe(item)
+    if item.detail then
+      return
+    end
+    local map = item.map
+    local location = definition(map.callback, map.sid, map.lnum)
+    if location then
+      item.file, item.pos = location.file, location.pos
+    end
+    item.detail, item.ft = vim.inspect(map), "lua"
+  end
   for _, mode in ipairs(opts.modes or { "n", "v", "x", "s", "o", "i", "c", "t" }) do
     local function add(list, scope)
       for _, map in ipairs(list) do
         if opts.plugs or not map.lhs:match("^<Plug>") then
-          local item = util.definition(map.callback, map.sid, map.lnum) or {}
+          local item = { key = mode .. "\0" .. map.lhs }
           item.lhs, item.mode, item.map = map.lhs, mode, map
           item.text = ("%s %s  %s  %s  %s"):format(mode, map.lhs, scope, map.desc or "", map.rhs or "")
-          item.detail, item.ft = vim.inspect(map), "lua"
           maps[mode .. "\0" .. map.lhs] = item
         end
       end
@@ -30,13 +41,17 @@ return function(opts)
     resume_refresh = true,
     format_item = util.format,
     preview = { enabled = true },
-    previewer = util.preview,
+    previewer = function(ctx)
+      describe(ctx.item)
+      util.preview(ctx)
+    end,
     on_choice = function(item)
       if not item then
         return
       end
       util.context(origin, function()
         if opts.action == "definition" then
+          describe(item)
           if item.file then
             util.jump(item)
           else

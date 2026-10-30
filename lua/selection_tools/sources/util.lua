@@ -71,7 +71,7 @@ function M.preview(ctx)
   )
 end
 
-function M.definition(callback, sid, lnum)
+function M.definition(callback, sid, lnum, script_name)
   if type(callback) == "function" then
     local info = debug.getinfo(callback, "S")
     if info and info.source:sub(1, 1) == "@" then
@@ -79,11 +79,37 @@ function M.definition(callback, sid, lnum)
     end
   end
   if sid and sid > 0 then
-    for _, script in ipairs(vim.fn.getscriptinfo()) do
-      if script.sid == sid and script.name ~= "" then
-        return { file = script.name, pos = { math.max(1, lnum or 1), 0 } }
+    if script_name then
+      local file = script_name(sid)
+      if file then
+        return { file = file, pos = { math.max(1, lnum or 1), 0 } }
+      end
+    else
+      for _, script in ipairs(vim.fn.getscriptinfo()) do
+        if script.sid == sid and script.name ~= "" then
+          return { file = script.name, pos = { math.max(1, lnum or 1), 0 } }
+        end
       end
     end
+  end
+end
+
+-- Keep the script index local to one picker; later pickers see newly loaded scripts.
+function M.definitions()
+  local scripts
+  local function script_name(sid)
+    if not scripts then
+      scripts = {}
+      for _, script in ipairs(vim.fn.getscriptinfo()) do
+        if script.name ~= "" then
+          scripts[script.sid] = script.name
+        end
+      end
+    end
+    return scripts[sid]
+  end
+  return function(callback, sid, lnum)
+    return M.definition(callback, sid, lnum, script_name)
   end
 end
 

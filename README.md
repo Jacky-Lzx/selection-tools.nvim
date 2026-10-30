@@ -202,6 +202,7 @@ local picker = require("selection_tools").open({
 stylua --check lua plugin tests
 nvim --headless -u NONE -n -i NONE -l tests/run.lua
 nvim --headless -u NONE -n -i NONE -l tests/sources.lua
+nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 python3 tests/tui.py
 ```
 
@@ -254,3 +255,5 @@ python3 tests/tui.py
 所有搜索源均可通过 `pick(name, opts)`、同名 Lua 函数或 `:SelectionTools name` 调用。需要实时全文搜索的快捷键可调用 `grep({ regex = true })`，保持原 Snacks 正则搜索语义。
 
 图标目录来自 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) 和 [unicode-emoji-json](https://github.com/muan/unicode-emoji-json)，首次下载需要 curl；失败时仍可使用本地符号和 devicons。`custom_sources = { name = "/path/icons.json" }` 接受 `[{"icon":"λ","name":"lambda","category":"math"}]` 或 `[["λ","lambda"]]`。远程目录缓存位于 `stdpath("cache")/selection-tools/icons/`。
+
+高亮属性、快捷键/自动命令定义和用户命令详情仅在预览当前项时生成；快捷键定义定位在一次 picker 中复用脚本索引，新 picker 会重新读取。
