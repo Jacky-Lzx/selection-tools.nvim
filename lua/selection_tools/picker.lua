@@ -872,6 +872,11 @@ function Picker:_events()
   actions.system_open = function()
     require("selection_tools.actions").open(self)
   end
+  for _, mode in ipairs({ "split", "vsplit", "tab" }) do
+    actions[mode] = function()
+      require("selection_tools.actions").edit(self, mode)
+    end
+  end
   for _, name in ipairs({ "quickfix", "quickfix_all", "loclist", "loclist_all" }) do
     actions[name] = function()
       require("selection_tools.actions").export(self, name:match("^loclist") ~= nil, name:match("_all$") ~= nil)

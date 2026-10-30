@@ -37,7 +37,7 @@ def run_case(case):
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
         if case == "workflows_tui":
             actions.update(regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
-                           scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11")
+                           scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11", split=b"\x16")
         if case == "grep_columns_tui":
             actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
         if case == "grep_tui":

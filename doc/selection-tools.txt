@@ -114,6 +114,10 @@ Result exports: CTRL-Q sends marked items, or all filtered results without marks
 to Quickfix. CTRL-L targets the calling window location list. Only file/buffer
 locations are exported. keys.quickfix_all and keys.loclist_all always export all.
 
+CTRL-X opens locations in horizontal splits, CTRL-V in vertical splits, and
+CTRL-T in tabs. Each selected item gets its own window/tab; without marks only
+the current item opens. Loaded dirty buffers and exact positions are preserved.
+
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
 The grep source performs live full-text search using ripgrep JSON output.

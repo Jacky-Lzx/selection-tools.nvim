@@ -45,6 +45,30 @@ function M.export(picker, location, all)
   vim.cmd(location and "lopen" or "copen")
 end
 
+function M.edit(picker, mode)
+  if picker.closed or picker.matching then
+    return
+  end
+  local commands = { split = "split", vsplit = "vsplit", tab = "tabnew" }
+  assert(commands[mode], "Unknown open mode")
+  local items = vim.tbl_filter(function(item)
+    return type(item) == "table" and not item.dir and (item.file or item.bufnr or item.buf)
+  end, picker:selected({ fallback = true }))
+  if #items == 0 then
+    vim.notify("No file locations to open", vim.log.levels.INFO)
+    return
+  end
+  local origin = picker.origin_win
+  picker:close()
+  if vim.api.nvim_win_is_valid(origin) then
+    vim.api.nvim_set_current_win(origin)
+  end
+  for _, item in ipairs(items) do
+    vim.cmd(commands[mode])
+    require("selection_tools.sources.util").jump(vim.tbl_extend("force", {}, item, { bufnr = item.bufnr or item.buf }))
+  end
+end
+
 local function value(item)
   if type(item) ~= "table" then
     return tostring(item)

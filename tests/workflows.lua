@@ -143,6 +143,41 @@ test("hidden and ignored files are independently controlled", function()
   eq(#p.matches, 2)
   p:close()
 end)
+test("split, vertical split and tabs preserve dirty buffers and exact positions", function()
+  local file = fixture .. "/split | %.lua"
+  vim.fn.writefile({ "one", "two", "three", "four" }, file)
+  local buf = vim.fn.bufadd(file)
+  vim.fn.bufload(buf)
+  vim.api.nvim_buf_set_lines(buf, 2, 3, false, { "dirty three" })
+  local origin = vim.api.nvim_get_current_win()
+  for _, mode in ipairs({ "split", "vsplit", "tab" }) do
+    local p = tools.open({
+      items = { { file = file, pos = { 3, 2 } } },
+      format_item = function(item)
+        return item.file
+      end,
+    })
+    require("selection_tools.actions").edit(p, mode)
+    assert(p.closed and vim.api.nvim_get_current_win() ~= origin)
+    eq(vim.api.nvim_get_current_buf(), buf)
+    eq(vim.api.nvim_win_get_cursor(0), { 3, 2 })
+    eq(vim.api.nvim_buf_get_lines(buf, 2, 3, false), { "dirty three" })
+    assert(vim.bo[buf].modified)
+    vim.cmd(mode == "tab" and "tabclose" or "close")
+    vim.api.nvim_set_current_win(origin)
+  end
+  vim.bo[buf].modified = false
+end)
+test("multi-selection opens one window per selected location", function()
+  local count = #vim.api.nvim_list_wins()
+  local p = picker()
+  p:toggle()
+  p:move(1)
+  p:toggle()
+  require("selection_tools.actions").edit(p, "vsplit")
+  eq(#vim.api.nvim_list_wins(), count + 2)
+  eq(vim.fs.basename(vim.api.nvim_buf_get_name(0)), "b.lua")
+end)
 vim.fn.delete(fixture, "rf")
 print(("%d workflow tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

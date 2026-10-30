@@ -104,6 +104,8 @@ require("selection_tools").grep({
 
 `<C-q>` 将多选项（未多选时为全部过滤结果）发送到 Quickfix，`<C-l>` 发送到调用窗口的 Location list，并打开列表。只有文件位置条目会被导出；行列号与原始代码内容保留。可将 `keys.quickfix_all` / `keys.loclist_all` 配置为始终导出全部过滤结果。
 
+`<C-x>` 水平分屏、`<C-v>` 垂直分屏、`<C-t>` 新 Tab 打开当前位置；多选时每项各开一个窗口或 Tab。文件、buffer、grep 和最近文件等位置条目均适用，保留未保存内容及行列位置。
+
 ## 搜索范围与模式
 
 文件搜索和 grep 窗口内可用 `<A-h>` 切换隐藏文件、`<A-i>` 切换忽略文件、`<A-f>` 设置搜索目录、`<A-g>` 设置文件 glob（逗号分隔，`!` 排除，例如 `*.rs,!vendor/**`）。grep 另有 `<A-r>` 切换正则/字面模式、`<A-c>` 循环 smart/sensitive/ignore 大小写策略。状态显示在标题中；操作会保留输入、取消旧任务并重新搜索，`resume()` 保留这些选项。文件 glob 过滤需要 ripgrep。

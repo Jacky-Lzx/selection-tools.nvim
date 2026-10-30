@@ -7,6 +7,7 @@ vim.fn.writefile({ "needle[1]" }, directory .. "/root.lua")
 vim.fn.writefile({ "needle[1]" }, directory .. "/sub/child.lua")
 local p = tools.grep({ cwd = directory, query = "needle[1]", debounce_ms = 0 })
 local stage, ticks = "start", 0
+local origin = p.origin_win
 local timer = assert(vim.uv.new_timer())
 local function mark(value)
   vim.fn.writefile({ value }, directory .. "/stage")
@@ -47,9 +48,19 @@ timer:start(
       elseif stage == "exported" and p.closed then
         local qf = vim.fn.getqflist()
         assert(#qf == 1 and qf[1].lnum == 1 and qf[1].col == 1)
+        vim.cmd.cclose()
+        vim.api.nvim_set_current_win(origin)
+        p = tools.files({ cwd = directory .. "/sub" })
+        stage = "split_ready"
+      elseif stage == "split_ready" and not p.loading and vim.api.nvim_get_mode().mode == "i" then
+        mark("split")
+        stage = "split_done"
+      elseif stage == "split_done" and p.closed then
+        assert(vim.api.nvim_get_current_win() ~= origin)
+        assert(vim.fs.basename(vim.api.nvim_buf_get_name(0)) == "child.lua")
         finish(
           true,
-          "PASS terminal search controls: literal/regex toggle, directory prompt keeps picker alive and input intact, scoped results export to Quickfix"
+          "PASS terminal workflow: search mode/scope prompts, exact Quickfix exports, vertical split key opens selected file"
         )
       end
     end, debug.traceback)
