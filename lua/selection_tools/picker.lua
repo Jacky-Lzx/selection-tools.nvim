@@ -771,7 +771,12 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsBorder", { default = true, link = "FloatBorder" })
   api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
   api.nvim_set_hl(0, "SelectionToolsMatch", { default = true, link = "Search" })
-  api.nvim_set_hl(0, "SelectionToolsCount", { default = true, link = "Comment" })
+  local count_hl = api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false, create = false })
+  if vim.tbl_isempty(count_hl) then
+    count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
+  end
+  count_hl.italic = false
+  api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
   api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
   api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })
   self:_events()
