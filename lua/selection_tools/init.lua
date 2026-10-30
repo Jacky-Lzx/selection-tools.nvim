@@ -15,7 +15,6 @@ local defaults = {
   },
   preview = {
     enabled = false,
-    image = { enabled = true, backend = "auto", max_size = 20 * 1024 * 1024, timeout_ms = 5000 },
     max_size = 1024 * 1024,
     max_lines = 10000,
     max_line_length = 1000,

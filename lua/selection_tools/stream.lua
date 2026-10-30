@@ -7,7 +7,6 @@ function M.start(cmd, opts, ctx, decode)
   local reason, stream_error
   local limit, max_output = opts.limit or 10000, opts.max_output or 32 * 1024 * 1024
   local max_line = opts.max_line_bytes or 1024 * 1024
-  local separator = opts.separator or "\n"
   assert(limit >= 1 and max_output >= 1 and max_line >= 1, "Search limits must be positive")
   local function kill()
     if process and not process:is_closing() then
@@ -47,11 +46,11 @@ function M.start(cmd, opts, ctx, decode)
     end
     local items = {}
     for _ = 1, 500 do
-      local newline = pending:find(separator, 1, true)
+      local newline = pending:find("\n", 1, true)
       while not newline and queue[read] do
         pending = pending .. queue[read]
         queue[read], read = false, read + 1
-        newline = pending:find(separator, 1, true)
+        newline = pending:find("\n", 1, true)
         if #pending > max_line and not newline then
           break
         end
@@ -74,7 +73,7 @@ function M.start(cmd, opts, ctx, decode)
       end
       local line = pending:sub(1, newline - 1)
       pending = pending:sub(newline + 1)
-      if line ~= "" or opts.keep_empty then
+      if line ~= "" then
         local ok, item = pcall(decode, line)
         if not ok then
           finish(item)
@@ -96,7 +95,7 @@ function M.start(cmd, opts, ctx, decode)
     if #items > 0 then
       ctx.append_items(items)
     end
-    if queue[read] or pending:find(separator, 1, true) then
+    if queue[read] or pending:find("\n", 1, true) then
       schedule()
     elseif exited then
       if reason then

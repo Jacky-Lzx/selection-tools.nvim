@@ -3,8 +3,6 @@ local M = {
     "files",
     "buffers",
     "grep",
-    "git_log",
-    "git_diff",
     "projects",
     "recent",
     "todo_comments",

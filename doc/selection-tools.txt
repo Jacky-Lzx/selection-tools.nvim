@@ -83,10 +83,6 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsCount        Comment colors, with italic disabled
   SelectionToolsFileIcon     Comment
   SelectionToolsFileLocation Comment foreground without italics
-  SelectionToolsDiffAdd      Added
-  SelectionToolsDiffDelete   Removed
-  SelectionToolsDiffHunk     Title
-  SelectionToolsDiffHeader   Comment
   SelectionToolsDirectoryIcon Directory
   SelectionToolsPreviewLine  CursorLine
   SelectionToolsPreviewMatch Search
@@ -167,22 +163,6 @@ and ALT-C case (smart/sensitive/ignore). Flags appear in the title. Changes
 cancel/restart the finder without changing the input and are retained by resume.
 File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
 globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).
-
-Git sources: git_log({cwd,limit=200,all=false,file}) searches commit metadata
-and previews patches. Confirm opens a read-only diff split, without checkout.
-git_diff({cwd,staged=false,untracked=true}) lists index/worktree changes;
-staged=true restricts to index changes. Previews show separate staged/worktree
-sections and support renamed, deleted, untracked and binary paths. Confirm opens
-existing files, or a read-only diff for deleted paths. Git runs asynchronously
-with literal pathspecs, no external diff/textconv, bounded max_lines=10000 and
-max_size=1 MiB. Browsing never stages files or changes HEAD/worktree contents.
-
-Image previews: preview.image={enabled=true,backend="auto",max_size=20 MiB,
-timeout_ms=5000}. Existing Snacks.image uses native graphics in supported
-terminals; otherwise chafa produces colored symbol previews. backend="chafa"
-or "snacks" forces one, and preview.image=false disables rendering. PDF page 1
-requires pdftoppm; SVG may use rsvg-convert. Dependencies load only for images.
-Cancel/resize/close release conversions, temporary files and native placements.
 
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
 injections and multiline strings. Loaded buffers are read without modification;
