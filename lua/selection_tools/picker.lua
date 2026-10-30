@@ -20,7 +20,7 @@ local function notify(err)
 end
 
 local function single_line(value)
-  return tostring(value):gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("\t", "  ")
+  return tostring(value):gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("\t", "  "):gsub("%z", "\\0")
 end
 
 function Picker:_layout()
@@ -49,7 +49,8 @@ function Picker:_draw_frame()
   end
   self:_draw_separators()
   local marked = vim.tbl_count(self.marks)
-  local status = self.error and "Error" or (self.loading and "Loading" or tostring(#self.entries))
+  local status = self.error and "Error"
+    or (self.loading and "Loading" or (self.matching and "Matching" or tostring(#self.entries)))
   local count = (" %d/%s%s "):format(#self.matches, status, marked > 0 and (" · " .. marked .. " selected") or "")
   count = vim.fn.strcharpart(count, 0, self.resolved.width - 1)
   local input_width = self.resolved.width - vim.fn.strdisplaywidth(count)
@@ -128,14 +129,18 @@ end
 
 function Picker:_set_items(items)
   assert(type(items) == "table", "finder results must be a list")
-  local entries, candidates = {}, {}
+  local entries = {}
   for index, item in ipairs(items) do
     local text = self.opts.format_item and self.opts.format_item(item) or tostring(item)
     entries[index] = { item = item, index = index, text = single_line(text) }
-    candidates[index] = { index = index, text = entries[index].text }
   end
-  self.entries, self.candidates, self.marks = entries, candidates, {}
-  self:_filter()
+  self.entries, self.marks = entries, {}
+  self.matcher:set_entries(entries)
+  if self.list_buf then
+    self:_filter()
+  else
+    self.matches = entries
+  end
 end
 
 function Picker:_filter()
@@ -143,19 +148,28 @@ function Picker:_filter()
     return
   end
   self.positions = {}
-  if self.query == "" or self.opts.match == false or #self.entries == 0 then
-    self.matches = self.entries
-  else
-    local result = vim.fn.matchfuzzypos(self.candidates, self.query, { key = "text", matchseq = 1 })
-    -- Vimscript conversion copies dictionaries; resolve back to original Lua items.
-    self.matches = {}
-    for _, entry in ipairs(result[1]) do
-      self.matches[#self.matches + 1] = self.entries[entry.index]
-    end
-    self.positions = result[2]
-  end
   self.index, self.offset = 1, 0
-  self:_render()
+  if self.query == "" or self.opts.match == false or #self.entries == 0 then
+    self.matcher:cancel()
+    self.matching, self.match_backend = false, "none"
+    self.matches = self.entries
+    self:_render()
+    return
+  end
+  local backend = self.matcher:select(self.query)
+  self.matching, self.match_backend = backend == "skim", backend
+  if self.matching then
+    self.matches = {}
+    self:_render()
+  end
+  self.matcher:run(self.query, backend, function(matches, positions, used)
+    if self.closed then
+      return
+    end
+    self.matching, self.match_backend = false, used
+    self.matches, self.positions, self.index, self.offset = matches, positions, 1, 0
+    self:_render()
+  end)
 end
 
 function Picker:_render()
@@ -185,7 +199,8 @@ function Picker:_render()
     self.row_to_index[row] = i
   end
   if count == 0 then
-    lines[1] = self.error and ("Error: " .. single_line(self.error)) or (self.loading and "Loading…" or "No results")
+    lines[1] = self.error and ("Error: " .. single_line(self.error))
+      or (self.loading and "Loading…" or (self.matching and "Matching…" or "No results"))
   end
   self.rendering = true
   vim.bo[self.list_buf].modifiable = true
@@ -194,6 +209,11 @@ function Picker:_render()
   api.nvim_buf_clear_namespace(self.list_buf, ns, 0, -1)
   if count > 0 then
     for row, index in pairs(self.row_to_index) do
+      if not self.positions[index] and self.match_backend == "skim" then
+        -- Only visible rows need highlight positions from the native matcher.
+        self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
+          or {}
+      end
       for _, pos in ipairs(self.positions[index] or {}) do
         local start = vim.fn.byteidx(self.matches[index].text, pos) + prefix
         local finish = vim.fn.byteidx(self.matches[index].text, pos + 1) + prefix
@@ -409,6 +429,11 @@ function Picker:current()
   end
 end
 
+---Report the backend used for the current query and any fallback error.
+function Picker:matcher_status()
+  return { backend = self.match_backend or "none", pending = self.matching == true, error = self.matcher.last_error }
+end
+
 function Picker:confirm()
   if self.closed then
     return
@@ -425,6 +450,8 @@ function Picker:close(item, index, selected)
     return
   end
   self.closed = true
+  self.matching = false
+  self.matcher:cancel()
   self:_cancel_finder()
   if self.preview then
     self.preview:cancel()
@@ -679,6 +706,7 @@ function Picker.new(opts)
     generation = 0,
     marks = {},
   }, Picker)
+  self.matcher = require("selection_tools.matcher").new(opts.matcher)
   local resolved = self:_layout()
   -- Validate formatting before opening windows or dismissing an existing picker.
   if opts.items then

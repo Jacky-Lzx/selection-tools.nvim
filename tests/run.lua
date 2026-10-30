@@ -637,6 +637,269 @@ test("copy and system-open use all marked paths without closing the picker", fun
   p:close()
 end)
 
+test("native string matching preserves duplicate labels, objects and indices", function()
+  local items = { { text = "same", run = function() end }, { text = "same" }, { text = "other" } }
+  local p = tools.open({
+    items = items,
+    format_item = function(item)
+      return item.text
+    end,
+    matcher = { backend = "native" },
+    query = "sme",
+  })
+  eq(#p.matches, 2)
+  assert(p:current() == items[1])
+  p:move(1)
+  local item, index = p:current()
+  assert(item == items[2] and index == 2)
+  eq(p:matcher_status().backend, "native")
+  p:close()
+end)
+
+local function fake_skim(fn)
+  local system, executable = vim.system, vim.fn.executable
+  local jobs = {}
+  vim.fn.executable = function(name)
+    if name == "selection-test-sk" then
+      return 1
+    end
+    return executable(name)
+  end
+  vim.system = function(command, opts, callback)
+    if command[1] ~= "selection-test-sk" then
+      return system(command, opts, callback)
+    end
+    local job = { command = command, opts = opts, callback = callback, killed = false }
+    jobs[#jobs + 1] = job
+    return {
+      is_closing = function()
+        return job.killed
+      end,
+      kill = function()
+        job.killed = true
+      end,
+    }
+  end
+  local ok, err = xpcall(function()
+    fn(jobs)
+  end, debug.traceback)
+  vim.system, vim.fn.executable = system, executable
+  assert(ok, err)
+end
+
+local fake_matcher = { backend = "skim", skim = { command = "selection-test-sk", debounce_ms = 0 } }
+
+test("async skim cancels stale queries, clears old choices and preserves identity", function()
+  fake_skim(function(jobs)
+    local old, new = { text = "old" }, { text = "new", run = function() end }
+    local choices = 0
+    local p = tools.open({
+      items = { old, new },
+      format_item = function(item)
+        return item.text
+      end,
+      matcher = fake_matcher,
+      on_choice = function()
+        choices = choices + 1
+      end,
+    })
+    p:set_query("old")
+    assert(p.matching and p:current() == nil)
+    p:confirm()
+    eq(choices, 0)
+    p:set_query("new")
+    assert(jobs[1].killed)
+    jobs[2].callback({ code = 0, stdout = "2\tnew\0", stderr = "" })
+    jobs[1].callback({ code = 0, stdout = "1\told\0", stderr = "" })
+    drain()
+    assert(p:current() == new)
+    eq(p:matcher_status().backend, "skim")
+    p:set_query("old")
+    p:set_items({ { text = "replacement" } })
+    assert(jobs[3].killed)
+    jobs[3].callback({ code = 0, stdout = "1\told\0", stderr = "" })
+    jobs[4].callback({ code = 1, stdout = "", stderr = "" })
+    drain()
+    eq(#p.matches, 0)
+    p:set_query("replace")
+    p:close()
+    assert(jobs[5].killed)
+    jobs[5].callback({ code = 0, stdout = "1\treplacement\0", stderr = "" })
+    drain()
+    assert(not p:matcher_status().pending)
+    eq(choices, 1)
+  end)
+end)
+
+test("skim debounces input and clearing a query cancels pending work", function()
+  fake_skim(function(jobs)
+    local p = tools.open({
+      items = { "alpha", "beta" },
+      matcher = {
+        backend = "skim",
+        skim = { command = "selection-test-sk", debounce_ms = 25 },
+      },
+    })
+    p:set_query("a")
+    p:set_query("al")
+    p:set_query("alp")
+    eq(#jobs, 0)
+    assert(vim.wait(1000, function()
+      return #jobs == 1
+    end, 2))
+    eq(jobs[1].command[#jobs[1].command], "--filter=alp")
+    eq(jobs[1].opts.env.SKIM_DEFAULT_OPTIONS, "")
+    p:set_query("")
+    assert(jobs[1].killed and not p.matching)
+    eq(p:current(), "alpha")
+    jobs[1].callback({ code = 0, stdout = "1\talpha\0", stderr = "" })
+    drain()
+    eq(#p.matches, 2)
+    p:set_query("beta")
+    p:close()
+    drain()
+    drain()
+    eq(#jobs, 1)
+  end)
+end)
+
+test("skim timeout and corrupt output fall back once to native matching", function()
+  for _, response in ipairs({
+    { code = 124, stdout = "", stderr = "timeout" },
+    { code = 0, stdout = "99\talpha\0", stderr = "" },
+    { code = 0, stdout = "1\talpha", stderr = "" },
+    { code = 0, stdout = "1\twrong\0", stderr = "" },
+    { code = 0, stdout = "1\talpha\0" .. "1\talpha\0", stderr = "" },
+  }) do
+    fake_skim(function(jobs)
+      local p = tools.open({ items = { "alpha", "beta" }, matcher = fake_matcher })
+      p:set_query("alp")
+      jobs[1].callback(response)
+      drain()
+      eq(p:current(), "alpha")
+      assert(not p.matching and p:matcher_status().error)
+      eq(p:matcher_status().backend, "native")
+      p:set_query("bta")
+      eq(p:current(), "beta")
+      eq(#jobs, 1)
+      p:close()
+    end)
+  end
+end)
+
+test("large skim output yields so a new query can invalidate decoding", function()
+  fake_skim(function(jobs)
+    local items, records = {}, {}
+    for i = 1, 5000 do
+      items[i] = "item" .. i
+      records[i] = i .. "\t" .. items[i]
+    end
+    local p = tools.open({ items = items, matcher = fake_matcher })
+    p:set_query("item")
+    jobs[1].callback({ code = 0, stdout = table.concat(records, "\0") .. "\0", stderr = "" })
+    vim.schedule(function()
+      p:set_query("never")
+    end)
+    drain()
+    eq(#jobs, 2)
+    assert(p.matching and p:current() == nil)
+    jobs[2].callback({ code = 1, stdout = "", stderr = "" })
+    drain()
+    assert(not p.matching and #p.matches == 0)
+    p:close()
+  end)
+end)
+
+test("auto matcher falls back when skim is missing and bypasses source-filtered items", function()
+  local p = tools.select({ "alpha", "beta" }, {
+    matcher = { backend = "auto", threshold = 1, skim = { command = fixture .. "/missing-sk" } },
+    query = "bta",
+  }, function() end)
+  eq(p:current(), "beta")
+  eq(p:matcher_status().backend, "native")
+  assert(p:matcher_status().error:find("not found", 1, true))
+  p:close()
+  p = tools.open({ items = { "alpha", "beta" }, query = "zzz", match = false, matcher = fake_matcher })
+  eq(#p.matches, 2)
+  eq(p:matcher_status().backend, "none")
+  p:close()
+end)
+
+if vim.fn.executable("sk") == 1 then
+  test("real skim switches at the candidate threshold and retains duplicate objects", function()
+    local a, b, c = { text = "beta" }, { text = "beta", run = function() end }, { text = "alpha" }
+    local p = tools.open({
+      items = { a, b },
+      format_item = function(item)
+        return item.text
+      end,
+      multi = true,
+      matcher = { backend = "auto", threshold = 3, skim = { debounce_ms = 0 } },
+    })
+    p:set_query("bta")
+    eq(p:matcher_status().backend, "native")
+    p:set_items({ a, b, c })
+    assert(p.matching)
+    assert(vim.wait(5000, function()
+      return not p.matching
+    end, 2))
+    eq(p:matcher_status().backend, "skim")
+    assert(p:current() == a)
+    p:toggle()
+    p:move(1)
+    local item, index = p:current()
+    assert(item == b and index == 2)
+    p:set_query("alpha")
+    assert(vim.wait(5000, function()
+      return not p.matching
+    end, 2))
+    eq(p:matcher_status().backend, "skim")
+    assert(p:current() == c and p:selected()[1] == a)
+    p:close()
+  end)
+
+  test("real skim preserves smart case, Unicode and literal query membership", function()
+    local items = {
+      "foo bar",
+      "barfoo",
+      "foobar",
+      "a|b",
+      "!bang",
+      "a\\b",
+      "Abc",
+      "abc",
+      "你好 world",
+      "你好 世界",
+      "42",
+      "-x",
+      "a\0b",
+    }
+    local p = tools.open({ items = items, matcher = { backend = "skim", skim = { debounce_ms = 0 } } })
+    local texts = vim.tbl_map(function(entry)
+      return entry.text
+    end, p.entries)
+    for _, query in ipairs({ "foo bar", "a|b", "!bang", "a\\b", "Ab", "abc", "你好", "42", "-x", "不存在" }) do
+      p:set_query(query)
+      assert(vim.wait(5000, function()
+        return not p.matching
+      end, 2))
+      local actual = vim.tbl_map(function(entry)
+        return entry.text
+      end, p.matches)
+      local expected = vim.fn.matchfuzzypos(texts, query, { matchseq = 1 })[1]
+      table.sort(actual)
+      table.sort(expected)
+      eq(actual, expected)
+      if not query:find("[%s!^$|'\"\\%z]") then
+        eq(p:matcher_status().backend, "skim")
+      end
+    end
+    p:close()
+  end)
+else
+  print("SKIP real skim integration tests (sk not installed)")
+end
+
 vim.fn.delete(fixture, "rf")
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then

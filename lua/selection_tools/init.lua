@@ -13,6 +13,11 @@ local defaults = {
   },
   preview = { enabled = false, max_size = 1024 * 1024, max_lines = 10000, max_line_length = 1000 },
   history = { limit = 100, persist = false },
+  matcher = {
+    backend = "auto",
+    threshold = 50000,
+    skim = { command = "sk", algorithm = "arinae", debounce_ms = 10, timeout_ms = 10000 },
+  },
   select = {
     layout = { width = 0.5, min_width = 80, max_width = 100, height = 0.4, input_position = "top", reverse = false },
     preview = { enabled = false },

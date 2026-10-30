@@ -8,6 +8,7 @@ CONTENTS                                                    *selection-tools*
   3. Public API                     |selection-tools-api|
   4. Finder contract                |selection-tools-finder|
   5. Picker methods                 |selection-tools-methods|
+  6. Matching backends              |selection-tools-matcher|
 
 Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua dependencies.
 
@@ -85,7 +86,8 @@ Built-in sources:
   buffers  Listed buffers, current first then most recently used. Pass
            current=false to exclude the current buffer.
 
-Type to search with case-insensitive fuzzy matching. Enter confirms. Enter
+Type to search with smart-case fuzzy matching. Lowercase queries ignore case;
+queries containing uppercase characters respect case. Enter confirms. Enter
 with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
 cancels the old one. Leaving the picker windows cancels it. External window
 closure and input buffer destruction also clean up the picker.
@@ -200,10 +202,54 @@ picker:history_move(delta) Browse previous (-1) or next (+1) query.
 picker:scroll_list(dir)    Half-window list movement, -1 up / +1 down.
 picker:scroll_preview(dir) Half-window preview scroll, -1 up / +1 down.
 picker:current()           Return item, original_index; nils with no selection.
+picker:matcher_status()    { backend='none'|'native'|'skim', pending=boolean,
+                            error=string|nil }. Last fallback error is retained.
 picker:confirm()           Close and choose current item; no-op without matches.
 picker:close()             Cancel. Repeated close calls are harmless.
 
 Methods that modify a closed picker are no-ops. Treat all other fields as
 internal implementation details.
+
+===============================================================================
+6. MATCHING BACKENDS                                 *selection-tools-matcher*
+>lua
+    require('selection_tools').setup({
+      matcher = {
+        backend = 'auto',
+        threshold = 50000,
+        skim = {
+          command = 'sk',
+          algorithm = 'arinae',
+          debounce_ms = 10,
+          timeout_ms = 10000,
+        },
+      },
+    })
+<
+auto uses native matching below threshold and skim at/above it, if installed.
+The threshold counts all candidates, not current matches. native always uses
+matchfuzzypos with cached strings. skim prefers an async sk --filter process.
+Skim 5.8.0 is tested; no skim dependency is required to use the plugin.
+
+Each query cancels previous work, including debounce timers, processes and
+pending result decoding. Candidate records are cached between queries and
+carry original numeric IDs so duplicate labels retain their identities. Only
+visible rows need native match positions with the skim backend. The UI stays
+native, including preview, marks, clipboard actions and confirmation.
+
+Ranking differs between engines. Queries containing whitespace, ! ^ $ | quotes
+or backslashes, NUL, or more than 1024 characters use native matching even in
+skim mode. This avoids interpreting literal input as skim's extended search.
+Empty queries/lists and match=false bypass the matcher entirely (backend=none).
+
+While async matching is pending, old results are cleared, confirmation is a
+no-op, and the list displays Matching…. Existing marks are retained. Missing
+executables silently use native matching. A process failure, timeout or invalid
+result warns once and falls back to native for the rest of that picker. The
+matcher clears SKIM_DEFAULT_OPTIONS for its subprocess. matcher_status reports
+the current backend, pending flag and last fallback error.
+
+Per-call matcher options override setup defaults. The threshold is configurable;
+it is a conservative default rather than a universal performance crossover.
 
 vim:tw=78:ts=8:ft=help:norl:

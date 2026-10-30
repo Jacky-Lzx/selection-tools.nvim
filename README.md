@@ -6,6 +6,7 @@
 
 - Neovim 0.10+
 - 文件搜索需要 `fd` 或 `rg`（优先使用 `fd`）；普通列表选择无需外部程序
+- 大列表可选使用 `sk`（skim），已验证 5.8.0；缺少或不兼容时自动回退原生匹配
 
 ## 安装与配置
 
@@ -46,7 +47,7 @@ require("selection_tools").setup({ ui_select = true })
 
 不带参数时默认搜索文件，支持搜索源名称补全。
 
-直接输入可进行不区分大小写的模糊搜索；`<C-n>` / `<Down>` 和 `<C-p>` / `<Up>` 移动，`<CR>` 确认，`<Esc>` / `<C-c>` 取消。结果列表中还支持普通模式 `j` / `k`，按 `/` 返回搜索框。没有匹配结果时，回车不会关闭窗口或选中其他条目。
+直接输入可进行模糊搜索，使用 smart case（全小写查询忽略大小写，含大写字符时区分大小写）；`<C-n>` / `<Down>` 和 `<C-p>` / `<Up>` 移动，`<CR>` 确认，`<Esc>` / `<C-c>` 取消。结果列表中还支持普通模式 `j` / `k`，按 `/` 返回搜索框。没有匹配结果时，回车不会关闭窗口或选中其他条目。
 
 ```lua
 local selection = require("selection_tools")
@@ -55,6 +56,31 @@ selection.buffers({ current = false }) -- 排除当前 buffer
 ```
 
 `cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；全文搜索暂未内置。
+
+## 匹配后端
+
+```lua
+require("selection_tools").setup({
+  matcher = {
+    backend = "auto", -- "auto" / "native" / "skim"
+    threshold = 50000,
+    skim = {
+      command = "sk",
+      algorithm = "arinae",
+      debounce_ms = 10,
+      timeout_ms = 10000,
+    },
+  },
+})
+```
+
+默认按候选总数切换：少于 5 万条用 Neovim 原生匹配，达到阈值后异步调用 skim。阈值可按机器和数据调整，不随当前命中数量来回切换。原生匹配只向 `matchfuzzypos()` 传递字符串，返回后映射回原始对象；同名条目仍保留各自的索引和对象身份。
+
+skim 只负责过滤、排序，继续使用本插件的窗口、预览、多选和按键。候选数据编码后缓存；每次查询有独立的异步进程和代次，快速输入、清空查询、替换候选或关闭窗口都会取消旧任务，并忽略迟到的结果。大批结果分批解析，可见行才计算匹配高亮。处理期间显示 `Matching…` 并暂停确认，避免选到旧查询的结果。
+
+两个引擎的评分与排名可能不同。为保留原来的字面、顺序匹配语义，包含空白、`! ^ $ | ' "`、反斜杠或超长查询时使用原生匹配，显式选择 `skim` 也遵循这一规则。空查询、空候选和 `match = false` 不启动 skim。缺少可执行文件时静默回退；执行失败、超时或返回异常时提醒一次，该 picker 后续使用原生匹配。用户的 `SKIM_DEFAULT_OPTIONS` 不会注入到匹配命令中。
+
+可通过每次调用的 `matcher` 选项覆盖全局设置。`picker:matcher_status()` 返回 `{ backend = "none" | "native" | "skim", pending = boolean, error = string | nil }`，其中 `none` 表示无需本地匹配；`error` 记录最近的回退原因。
 
 ## 窗口、预览与操作
 
@@ -178,4 +204,4 @@ nvim --headless -u NONE -n -i NONE -l tests/run.lua
 python3 tests/tui.py
 ```
 
-测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端和真实终端输入。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。
+测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端和真实终端输入。已安装 skim 时，还会运行真实 skim 测试，以及 6 万条候选的连续输入、预览和多选终端测试；未安装时跳过这些外部集成测试。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。

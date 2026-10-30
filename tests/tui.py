@@ -14,7 +14,7 @@ import termios
 import time
 
 
-def main():
+def run_case(case):
     root = Path(__file__).resolve().parent.parent
     with tempfile.TemporaryDirectory(prefix="selection-tools-", dir="/private/tmp" if Path("/private/tmp").exists() else None) as directory:
         master, slave = pty.openpty()
@@ -26,11 +26,13 @@ def main():
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
         process = subprocess.Popen(
-            [shutil.which("nvim") or "nvim", "-u", "NONE", "-n", "-i", "NONE", "-c", "lua dofile('tests/tui.lua')"],
+            [shutil.which("nvim") or "nvim", "-u", "NONE", "-n", "-i", "NONE", "-c", "lua dofile('tests/" + case + ".lua')"],
             cwd=root, env=env, stdin=slave, stdout=slave, stderr=slave,
         )
         os.close(slave)
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
+        if case == "skim_tui":
+            actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
         handled = set()
         output = bytearray()
         deadline = time.monotonic() + 15
@@ -62,4 +64,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_case("tui")
+    if shutil.which("sk"):
+        run_case("skim_tui")
+    else:
+        print("SKIP skim terminal integration (sk not installed)")
