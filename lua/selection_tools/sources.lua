@@ -13,6 +13,7 @@ local M = {
     "search_history",
     "command_history",
     "qflist",
+    "loclist",
   },
 }
 

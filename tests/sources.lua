@@ -282,21 +282,38 @@ end)
 
 test("quickfix selection previews and updates the native list index", function()
   vim.fn.writefile({ "first", "second" }, fixture .. "/quickfix.txt")
-  vim.fn.setqflist(
-    {},
-    " ",
-    {
-      title = "test",
-      items = {
-        { filename = fixture .. "/quickfix.txt", lnum = 1, col = 1, text = "one" },
-        { filename = fixture .. "/quickfix.txt", lnum = 2, col = 2, text = "two" },
-      },
-    }
-  )
+  vim.fn.setqflist({}, " ", {
+    title = "test",
+    items = {
+      { filename = fixture .. "/quickfix.txt", lnum = 1, col = 1, text = "one" },
+      { filename = fixture .. "/quickfix.txt", lnum = 2, col = 2, text = "two" },
+    },
+  })
   local p = tools.qflist({ query = "two" })
   p:confirm()
   eq(vim.fn.getqflist({ idx = 0 }).idx, 2)
   eq(vim.api.nvim_win_get_cursor(0), { 2, 1 })
+end)
+
+test("location list belongs to the invoking window and rejects changed lists", function()
+  local origin = vim.api.nvim_get_current_win()
+  vim.fn.setloclist(
+    origin,
+    {},
+    " ",
+    { items = {
+      { filename = fixture .. "/quickfix.txt", lnum = 1, col = 3, text = "location" },
+    } }
+  )
+  local p = tools.loclist()
+  eq(#p.entries, 1)
+  p:confirm()
+  eq(vim.api.nvim_get_current_win(), origin)
+  eq(vim.api.nvim_win_get_cursor(0), { 1, 2 })
+  p = tools.loclist()
+  vim.fn.setloclist(origin, {}, "r", { items = {} })
+  p:confirm()
+  eq(vim.api.nvim_win_get_cursor(0), { 1, 2 })
 end)
 
 vim.fn.delete(fixture, "rf")

@@ -233,3 +233,5 @@ python3 tests/tui.py
 - `command_history()`：按最近顺序选择命令历史；确认后在原窗口执行命令。
 
 - `qflist()`：选择 Quickfix 条目，预览文件并保留原生列表索引；列表变化后拒绝使用过期位置。
+
+- `loclist()`：从调用窗口读取 Location list，并在该窗口跳转；不会读取 picker 窗口的列表。
