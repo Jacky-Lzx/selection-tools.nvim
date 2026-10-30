@@ -53,6 +53,21 @@ timer:start(
         p = tools.files({ cwd = directory .. "/sub" })
         stage = "split_ready"
       elseif stage == "split_ready" and not p.loading and vim.api.nvim_get_mode().mode == "i" then
+        mark("expand")
+        stage = "expanded"
+      elseif stage == "expanded" and p.normal_preview_height then
+        assert(vim.api.nvim_get_current_win() == p.input_win)
+        mark("collapse")
+        stage = "collapsed"
+      elseif stage == "collapsed" and not p.normal_preview_height then
+        mark("details")
+        stage = "details"
+      elseif stage == "details" and p.detail_win and vim.api.nvim_get_mode().mode == "n" then
+        assert(not p.closed and vim.api.nvim_get_current_win() == p.detail_win)
+        mark("details_close")
+        stage = "details_closed"
+      elseif stage == "details_closed" and not p.detail_win and vim.api.nvim_get_mode().mode == "i" then
+        assert(vim.api.nvim_get_current_win() == p.input_win)
         mark("split")
         stage = "split_done"
       elseif stage == "split_done" and p.closed then
@@ -60,7 +75,7 @@ timer:start(
         assert(vim.fs.basename(vim.api.nvim_buf_get_name(0)) == "child.lua")
         finish(
           true,
-          "PASS terminal workflow: search mode/scope prompts, exact Quickfix exports, vertical split key opens selected file"
+          "PASS terminal workflow: search mode/scope prompts, exact Quickfix exports, full item details return to picker, vertical split key opens selected file"
         )
       end
     end, debug.traceback)

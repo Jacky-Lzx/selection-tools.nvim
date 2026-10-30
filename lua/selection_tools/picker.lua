@@ -727,7 +727,13 @@ function Picker:close(item, index, selected)
     api.nvim_del_augroup_by_id(self.group)
   end
   local focused = api.nvim_get_current_win()
-  local owns_focus = focused == self.input_win or focused == self.list_win or focused == self.preview_win
+  local owns_focus = focused == self.input_win
+    or focused == self.list_win
+    or focused == self.preview_win
+    or focused == self.detail_win
+  if self.detail_win then
+    require("selection_tools.details").close(self)
+  end
   if owns_focus then
     vim.cmd.stopinsert()
   end
@@ -763,6 +769,50 @@ function Picker:close(item, index, selected)
   if self.opts.on_choice then
     self.opts.on_choice(item, index, selected)
   end
+end
+
+function Picker:resize()
+  local ok, resolved = pcall(self._layout, self)
+  if not ok then
+    self:close()
+    return
+  end
+  if self.preview_win and not resolved.preview then
+    local win = self.preview_win
+    self.preview_win = nil
+    self.preview:cancel()
+    api.nvim_win_close(win, true)
+  elseif resolved.preview and not self.preview_win then
+    self.preview_win = api.nvim_open_win(self.preview_buf, false, resolved.preview)
+    self.preview.initialized = false
+    vim.wo[self.preview_win].wrap = false
+    vim.wo[self.preview_win].list = false
+    vim.wo[self.preview_win].foldenable = false
+    vim.wo[self.preview_win].scrolloff = 0
+    vim.wo[self.preview_win].number = true
+    vim.wo[self.preview_win].relativenumber = false
+    vim.wo[self.preview_win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
+  end
+  for _, name in ipairs({ "frame", "input", "list", "preview" }) do
+    if resolved[name] then
+      api.nvim_win_set_config(self[name .. "_win"], resolved[name])
+    end
+  end
+  self:_render()
+end
+
+function Picker:expand_preview()
+  if self.closed or not self.preview or not self.preview_win then
+    return
+  end
+  if self.normal_preview_height then
+    self.opts.layout.preview_height = self.normal_preview_height
+    self.normal_preview_height = nil
+  else
+    self.normal_preview_height = self.opts.layout.preview_height
+    self.opts.layout.preview_height = 1
+  end
+  self:resize()
 end
 
 function Picker:_events()
@@ -807,6 +857,7 @@ function Picker:_events()
           and win ~= self.input_win
           and win ~= self.list_win
           and win ~= self.preview_win
+          and win ~= self.detail_win
         then
           self:close()
         end
@@ -816,33 +867,7 @@ function Picker:_events()
   api.nvim_create_autocmd("VimResized", {
     group = self.group,
     callback = function()
-      local ok, resolved = pcall(self._layout, self)
-      if not ok then
-        self:close()
-        return
-      end
-      if self.preview_win and not resolved.preview then
-        local win = self.preview_win
-        self.preview_win = nil
-        self.preview:cancel()
-        api.nvim_win_close(win, true)
-      elseif resolved.preview and not self.preview_win then
-        self.preview_win = api.nvim_open_win(self.preview_buf, false, resolved.preview)
-        self.preview.initialized = false
-        vim.wo[self.preview_win].wrap = false
-        vim.wo[self.preview_win].list = false
-        vim.wo[self.preview_win].foldenable = false
-        vim.wo[self.preview_win].scrolloff = 0
-        vim.wo[self.preview_win].number = true
-        vim.wo[self.preview_win].relativenumber = false
-        vim.wo[self.preview_win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
-      end
-      for _, name in ipairs({ "frame", "input", "list", "preview" }) do
-        if resolved[name] then
-          api.nvim_win_set_config(self[name .. "_win"], resolved[name])
-        end
-      end
-      self:_render()
+      self:resize()
     end,
   })
   api.nvim_create_autocmd("CursorMoved", {
@@ -916,6 +941,12 @@ function Picker:_events()
     actions["search_" .. name] = function()
       require("selection_tools.search_options").action(self, name)
     end
+  end
+  actions.preview_expand = function()
+    self:expand_preview()
+  end
+  actions.details = function()
+    require("selection_tools.details").open(self)
   end
   actions.ignore = function() end
   for name, action in pairs(self.opts.actions or {}) do

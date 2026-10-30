@@ -178,6 +178,36 @@ test("multi-selection opens one window per selected location", function()
   eq(#vim.api.nvim_list_wins(), count + 2)
   eq(vim.fs.basename(vim.api.nvim_buf_get_name(0)), "b.lua")
 end)
+test("details retain complete code and path and return to the same picker", function()
+  local code = "\t" .. string.rep("中文 needle ", 200)
+  local item = {
+    file = fixture .. "/long | %.lua",
+    pos = { 18, 8 },
+    code = code,
+    text = "clipped label",
+    line_matches = { { 8, 14 } },
+  }
+  local p = tools.open({
+    items = { item },
+    format_item = function(value)
+      return value.text
+    end,
+  })
+  require("selection_tools.details").open(p)
+  local win, buf = p.detail_win, p.detail_buf
+  assert(vim.wo[win].wrap and not vim.bo[buf].modifiable)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  eq(lines[1], "File: " .. item.file)
+  eq(lines[2], "Position: 18:9")
+  eq(lines[4], code)
+  assert(not p.closed and p:current() == item)
+  require("selection_tools.details").close(p, true)
+  assert(not vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_get_current_win() == p.input_win)
+  require("selection_tools.details").open(p)
+  buf = p.detail_buf
+  p:close()
+  assert(not vim.api.nvim_buf_is_valid(buf))
+end)
 vim.fn.delete(fixture, "rf")
 print(("%d workflow tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

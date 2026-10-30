@@ -118,6 +118,12 @@ CTRL-X opens locations in horizontal splits, CTRL-V in vertical splits, and
 CTRL-T in tabs. Each selected item gets its own window/tab; without marks only
 the current item opens. Loaded dirty buffers and exact positions are preserved.
 
+F2 opens read-only, wrapped item details: full path, position and complete code
+or content. Normal-mode navigation works; CTRL-Y copies full content. q/Esc/F2
+returns to the same picker without losing input/selection. Closing the picker
+also removes its detail window and scratch buffer. F3 expands the existing
+preview while retaining a small result list; press again to restore its ratio.
+
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
 Custom finder callbacks may call ctx.append_items(items) to append rows and
