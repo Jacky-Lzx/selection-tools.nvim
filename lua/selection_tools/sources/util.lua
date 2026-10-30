@@ -123,6 +123,55 @@ function M.show(item)
   vim.bo[buf].modified, vim.bo[buf].modifiable = false, false
 end
 
+-- Defer the first batch until the UI can redraw, then yield between batches.
+-- produce(checkpoint) returns candidates; done optionally consumes them internally.
+function M.collect(ctx, produce, done)
+  local cancelled, timer, deadline, units = false, nil, 0, 0
+  local function current()
+    return not cancelled and not ctx.is_cancelled()
+  end
+  local thread = coroutine.create(function()
+    return produce(function()
+      units = units + 1
+      if units >= 256 or vim.uv.hrtime() >= deadline then
+        coroutine.yield()
+      end
+    end)
+  end)
+  local step
+  step = function()
+    timer = nil
+    if not current() then
+      return
+    end
+    deadline, units = vim.uv.hrtime() + 2000000, 0
+    local ok, result = coroutine.resume(thread)
+    if not current() then
+      return
+    end
+    if not ok then
+      ctx.fail(result)
+    elseif coroutine.status(thread) == "dead" then
+      if done then
+        done(result)
+      else
+        ctx.set_items(result)
+        ctx.done()
+      end
+    else
+      timer = vim.defer_fn(step, 1)
+    end
+  end
+  timer = vim.defer_fn(step, 1)
+  return function()
+    cancelled = true
+    if timer and not timer:is_closing() then
+      timer:stop()
+      timer:close()
+    end
+  end
+end
+
 function M.rg(opts, ctx, pattern, transform)
   local process, timer
   local function start()

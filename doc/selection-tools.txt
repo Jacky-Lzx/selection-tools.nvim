@@ -307,6 +307,9 @@ options apply to every source; per-call values override source defaults.
                    plugs=true adjust inclusion. Confirm replays keys in Normal
                    mode, matching Snacks. action='definition' navigates instead.
   help             Runtime doc/tags search, positioned preview, native :help.
+                   Deferred async reads and cancellable batched parsing. File
+                   metadata and runtime order invalidate the in-memory index;
+                   unchanged tags reuse the cached, sorted templates.
   man              Index local man directories from manpath -q or man -w;
                    paths={...} overrides discovery. Async man rendering and
                    native :Man confirmation. Requires man on PATH.

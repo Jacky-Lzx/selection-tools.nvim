@@ -242,7 +242,7 @@ python3 tests/tui.py
 
 - `keymaps()`：搜索全局及当前缓冲区各模式映射，预览定义；确认后沿用 Snacks 的 Normal 模式按键回放。action="definition" 可改为定位定义。
 
-- `help()`：搜索 runtime 中的 help tags，预览定位到标签，确认后打开原生帮助文档。
+- `help()`：搜索 runtime 中的 help tags，预览定位到标签，确认后打开原生帮助文档。窗口显示后异步读取并分批解析；缓存按标签文件元数据及 runtime 顺序失效。
 
 - `man()`：从 manpath 的本地手册目录索引页面，异步调用 man 预览，确认后用原生 :Man 打开；paths 可指定目录。
 

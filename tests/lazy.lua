@@ -112,6 +112,153 @@ test("script indexes are reused within a picker and refreshed for a new picker",
   assert(ok, err)
 end)
 
+test("candidate preparation yields to the event loop and stops on cancellation or failure", function()
+  local count, delivered, failed = 0, false, nil
+  local cancel = require("selection_tools.sources.util").collect({
+    is_cancelled = function()
+      return false
+    end,
+    set_items = function()
+      delivered = true
+    end,
+    done = function() end,
+    fail = function(err)
+      failed = err
+    end,
+  }, function(checkpoint)
+    for _ = 1, 10000 do
+      count = count + 1
+      checkpoint()
+    end
+    return {}
+  end)
+  eq(count, 0)
+  assert(vim.wait(1000, function()
+    return count > 0
+  end, 1))
+  assert(count < 10000)
+  cancel()
+  local stopped = count
+  vim.wait(20, function()
+    return false
+  end, 1)
+  eq(count, stopped)
+  assert(not delivered and not failed)
+  require("selection_tools.sources.util").collect({
+    is_cancelled = function()
+      return false
+    end,
+    fail = function(err)
+      failed = err
+    end,
+  }, function()
+    error("preparation failed")
+  end)
+  assert(vim.wait(1000, function()
+    return failed ~= nil
+  end, 1))
+  assert(tostring(failed):find("preparation failed", 1, true))
+end)
+
+test("help indexes reuse reads and invalidate changed files, runtime order and deletion", function()
+  local runtime, read = vim.api.nvim_get_runtime_file, vim.uv.fs_read
+  local reads, paths = 0, {}
+  local first, second = fixture .. "/one/tags", fixture .. "/two/tags"
+  vim.fn.mkdir(fixture .. "/one", "p")
+  vim.fn.mkdir(fixture .. "/two", "p")
+  vim.fn.writefile({ "shared_tag\tone.txt\t/*shared_tag*", "first_only\tone.txt\t/*first_only*" }, first)
+  vim.fn.writefile({ "shared_tag\ttwo.txt\t/*shared_tag*" }, second)
+  paths = { first, second }
+  vim.api.nvim_get_runtime_file = function(pattern, all)
+    if pattern == "doc/tags" then
+      return paths
+    end
+    return runtime(pattern, all)
+  end
+  vim.uv.fs_read = function(...)
+    reads = reads + 1
+    return read(...)
+  end
+  local function open(query)
+    local p = tools.help({ query = query, preview = { enabled = false } })
+    assert(p.loading and #p.entries == 0)
+    ready(p)
+    return p
+  end
+  local ok, err = xpcall(function()
+    local p = open("shared_tag")
+    eq(#p.matches, 1)
+    eq(p:current().file, fixture .. "/one/one.txt")
+    p:current().tag = "modified_by_caller"
+    p:close()
+    local initial = reads
+    p = open("shared_tag")
+    eq(reads, initial)
+    eq(p:current().tag, "shared_tag")
+    p:close()
+    paths = { second, first }
+    p = open("shared_tag")
+    eq(reads, initial)
+    eq(p:current().file, fixture .. "/two/two.txt")
+    p:close()
+    vim.fn.writefile({ "changed_tag_longer\tchanged.txt\t/*changed_tag_longer*" }, second)
+    p = open("changed_tag_longer")
+    eq(#p.matches, 1)
+    assert(reads > initial)
+    p:close()
+    vim.fn.delete(second)
+    p = open("changed_tag_longer")
+    eq(#p.matches, 0)
+    p:close()
+    paths = {}
+    p = open("first_only")
+    eq(#p.matches, 0)
+    p:close()
+  end, debug.traceback)
+  vim.api.nvim_get_runtime_file, vim.uv.fs_read = runtime, read
+  assert(ok, err)
+end)
+
+test("cancelled help reads release descriptors and cannot replace a later picker", function()
+  local runtime, read, close = vim.api.nvim_get_runtime_file, vim.uv.fs_read, vim.uv.fs_close
+  local path, reading, closes = fixture .. "/cancel-tags", false, 0
+  vim.fn.writefile({ "cancelled_help_tag\told.txt\t/*cancelled_help_tag*" }, path)
+  vim.api.nvim_get_runtime_file = function(pattern, all)
+    if pattern == "doc/tags" then
+      return { path }
+    end
+    return runtime(pattern, all)
+  end
+  vim.uv.fs_read = function(fd, size, offset, callback)
+    reading = true
+    return read(fd, size, offset, function(err, data)
+      vim.defer_fn(function()
+        callback(err, data)
+      end, 30)
+    end)
+  end
+  vim.uv.fs_close = function(...)
+    closes = closes + 1
+    return close(...)
+  end
+  local ok, err = xpcall(function()
+    local p = tools.help({ preview = { enabled = false } })
+    assert(vim.wait(1000, function()
+      return reading
+    end, 1))
+    p:close()
+    local next_picker = tools.select({ "new choice" }, {}, function() end)
+    assert(vim.wait(1000, function()
+      return closes > 0
+    end, 1))
+    eq(next_picker:current(), "new choice")
+    assert(p.closed and not next_picker.closed)
+    next_picker:close()
+  end, debug.traceback)
+  vim.api.nvim_get_runtime_file, vim.uv.fs_read, vim.uv.fs_close = runtime, read, close
+  assert(ok, err)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d lazy-loading tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

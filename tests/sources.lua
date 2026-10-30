@@ -382,6 +382,7 @@ test("help tags preview the definition and open native help", function()
   )
   vim.opt.runtimepath:prepend(fixture .. "/help")
   local p = tools.help({ query = "selection-tools-test-tag" })
+  ready(p)
   eq(#p.matches, 1)
   assert(vim.wait(1000, function()
     return vim.api.nvim_win_get_cursor(p.preview_win)[1] == 3
