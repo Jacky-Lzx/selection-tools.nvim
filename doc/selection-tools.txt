@@ -47,6 +47,15 @@ of the list. Movement keys follow screen directions, while move(delta) follows
 candidate rank. select.layout overrides the layout for select()/vim.ui.select;
 its default is a compact, forward list below an input at the top.
 
+Additional default keys and their action names:
+  CTRL-Q quickfix, CTRL-L loclist  Export marks, or all filtered results.
+  CTRL-X split, CTRL-V vsplit, CTRL-T tab  Open current/marked locations.
+  F2 details, F3 preview_expand    Inspect full content / expand preview.
+  ALT-R search_regex, ALT-C search_case  Grep matching modes.
+  ALT-H search_hidden, ALT-I search_ignored  File traversal flags.
+  ALT-F search_scope, ALT-G search_globs  Directory / file patterns.
+quickfix_all and loclist_all are available without default bindings.
+
 Optional key actions (none are bound by default):
   select_previous / select_next   Toggle mark, then move by rank -1 / +1.
   history_back / history_forward  Browse source history, preserving the draft.
@@ -73,6 +82,11 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsMatch        Search
   SelectionToolsCount        Comment colors, with italic disabled
   SelectionToolsFileIcon     Comment
+  SelectionToolsFileLocation Comment foreground without italics
+  SelectionToolsDiffAdd      Added
+  SelectionToolsDiffDelete   Removed
+  SelectionToolsDiffHunk     Title
+  SelectionToolsDiffHeader   Comment
   SelectionToolsDirectoryIcon Directory
   SelectionToolsPreviewLine  CursorLine
   SelectionToolsPreviewMatch Search
@@ -153,6 +167,15 @@ and ALT-C case (smart/sensitive/ignore). Flags appear in the title. Changes
 cancel/restart the finder without changing the input and are retained by resume.
 File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
 globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).
+
+Git sources: git_log({cwd,limit=200,all=false,file}) searches commit metadata
+and previews patches. Confirm opens a read-only diff split, without checkout.
+git_diff({cwd,staged=false,untracked=true}) lists index/worktree changes;
+staged=true restricts to index changes. Previews show separate staged/worktree
+sections and support renamed, deleted, untracked and binary paths. Confirm opens
+existing files, or a read-only diff for deleted paths. Git runs asynchronously
+with literal pathspecs, no external diff/textconv, bounded max_lines=10000 and
+max_size=1 MiB. Browsing never stages files or changes HEAD/worktree contents.
 
 Image previews: preview.image={enabled=true,backend="auto",max_size=20 MiB,
 timeout_ms=5000}. Existing Snacks.image uses native graphics in supported
@@ -283,9 +306,11 @@ own finder and cancel their timer in this function.
 Context:
   ctx.query              Query snapshot for this invocation.
   ctx.cwd                Calling cwd or explicit cwd.
+  ctx.opts               Current source options.
   ctx.is_cancelled()     True if closed or superseded by another query.
   ctx.set_items(items)   Replace the complete list, retaining original values.
-  ctx.done()             Clear loading state.
+  ctx.append_items(items) Append batches, preserving live grep rows and marks.
+  ctx.done(status)       Clear loading state; optional {truncated=reason}.
   ctx.fail(message)      Display and notify an error, clear loading state.
 
 The delivery methods schedule onto Neovim's event loop, so they may be called

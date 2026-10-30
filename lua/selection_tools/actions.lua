@@ -52,7 +52,7 @@ function M.edit(picker, mode)
   local commands = { split = "split", vsplit = "vsplit", tab = "tabnew" }
   assert(commands[mode], "Unknown open mode")
   local items = vim.tbl_filter(function(item)
-    return type(item) == "table" and not item.dir and (item.file or item.bufnr or item.buf)
+    return type(item) == "table" and not item.dir and not item.deleted and (item.file or item.bufnr or item.buf)
   end, picker:selected({ fallback = true }))
   if #items == 0 then
     vim.notify("No file locations to open", vim.log.levels.INFO)

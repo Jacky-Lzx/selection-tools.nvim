@@ -91,6 +91,11 @@ function Preview:write(lines, ft, title, pos)
       vim.cmd("normal! zz")
     end)
   end
+  if ft == "diff" then
+    require("selection_tools.diff").decorate(self.buf, lines)
+  else
+    api.nvim_buf_clear_namespace(self.buf, api.nvim_create_namespace("selection_tools_diff"), 0, -1)
+  end
   self:_decorate(lines, pos)
   self.picker.preview_title = title or "Preview"
   self.displayed = true

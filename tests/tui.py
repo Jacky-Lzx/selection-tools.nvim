@@ -35,6 +35,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "git_tui":
+            actions.update(git_query=b"history")
         if case == "workflows_tui":
             actions.update(regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
                            scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11", expand=b"\x1bOR", collapse=b"\x1bOR", details=b"\x1bOQ", details_close=b"q", split=b"\x16")
@@ -98,6 +100,8 @@ if __name__ == "__main__":
     run_case("grep_columns_tui")
     run_case("workflows_tui")
     run_case("syntax_tui")
+    if shutil.which("git"):
+        run_case("git_tui")
     if shutil.which("chafa") and shutil.which("rsvg-convert"):
         run_case("images_tui")
     else:

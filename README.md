@@ -114,6 +114,12 @@ require("selection_tools").grep({
 
 也可调用 `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })`，或在 `files()` / `grep()` 的调用选项中指定。
 
+## Git 搜索与 diff
+
+`git_log({ cwd, limit = 200, all = false, file })` 搜索提交 SHA、日期、作者及主题，预览提交补丁；确认在新窗口打开只读 diff。`git_diff({ cwd, staged = false, untracked = true })` 列出工作区和暂存区的变更，分别预览 Staged / Working tree 两段 diff，新增、删除和 hunk 标头使用独立高亮，也支持重命名、删除、未跟踪及二进制文件。`staged = true` 只列暂存区变更。
+
+确认现存文件会打开正文，删除的文件会打开只读 diff；不会重新创建删除路径。Git 命令异步执行，禁用外部 diff/textconv，文件名使用字面 pathspec，预览受 `max_lines`（默认 10000）和 `max_size`（默认 1 MiB）限制。所有操作仅用于浏览，不 checkout、暂存或修改工作区。也可用 `:SelectionTools git_log` / `:SelectionTools git_diff`。
+
 ## 图片预览
 
 文件列表中的 PNG/JPEG/GIF/WebP 等图片、SVG 和 PDF 默认显示图像预览。`preview.image.backend = "auto"` 在现有 Snacks.image 和终端支持时使用原生图像，否则按需调用 chafa，转换为带颜色高亮的字符图；PDF 显示第一页，需要 `pdftoppm`，SVG 可使用 `rsvg-convert`。不会自动安装依赖。Snacks 不作为必需依赖，也不接管本插件的 picker。
@@ -278,6 +284,7 @@ nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/images.lua
+nvim --headless -u NONE -n -i NONE -l tests/git.lua
 python3 tests/tui.py
 ```
 
