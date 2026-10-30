@@ -33,6 +33,7 @@ local defaults = {
 
 local config = vim.deepcopy(defaults)
 local sources = {}
+local builtins = require("selection_tools.sources")
 local previous_select
 local select_adapter = function(...)
   return M.select(...)
@@ -84,7 +85,10 @@ end
 
 ---@return string[]
 function M.sources()
-  local names = { files = true, buffers = true }
+  local names = {}
+  for _, name in ipairs(builtins.names) do
+    names[name] = true
+  end
   for name in pairs(sources) do
     names[name] = true
   end
@@ -96,8 +100,8 @@ end
 ---@return selection_tools.Picker
 function M.pick(name, opts)
   local source = sources[name]
-  if not source and (name == "files" or name == "buffers") then
-    source = require("selection_tools.sources")[name]
+  if not source then
+    source = builtins[name]
   end
   assert(source, "selection-tools: unknown source: " .. tostring(name))
   opts = opts or {}
@@ -105,12 +109,10 @@ function M.pick(name, opts)
   return M.open(vim.tbl_deep_extend("force", {}, spec, opts, { source = name }))
 end
 
-function M.files(opts)
-  return M.pick("files", opts)
-end
-
-function M.buffers(opts)
-  return M.pick("buffers", opts)
+for _, name in ipairs(builtins.names) do
+  M[name] = function(opts)
+    return M.pick(name, opts)
+  end
 end
 
 return M

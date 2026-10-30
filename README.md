@@ -55,7 +55,7 @@ selection.files({ cwd = vim.fn.expand("~/project"), hidden = true, ignored = fal
 selection.buffers({ current = false }) -- 排除当前 buffer
 ```
 
-`cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；全文搜索暂未内置。
+`cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；支持实时全文搜索。
 
 ## 匹配后端
 
@@ -205,3 +205,9 @@ python3 tests/tui.py
 ```
 
 测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端和真实终端输入。已安装 skim 时，还会运行真实 skim 测试，以及 6 万条候选的连续输入、预览和多选终端测试；未安装时跳过这些外部集成测试。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。
+
+## 内置搜索源
+
+- `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转，空查询不扫描目录。
+
+新增搜索源测试：`nvim --headless -u NONE -n -i NONE -l tests/sources.lua`。

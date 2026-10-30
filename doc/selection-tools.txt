@@ -99,7 +99,11 @@ numbers.
 
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
-Live grep is not included.
+The grep source performs live full-text search using ripgrep JSON output.
+It defaults to literal smart-case search; regex=true enables regex patterns.
+Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
+Confirming a result opens its exact file/line/column; an empty query does not
+start a search.
 
 ===============================================================================
 3. PUBLIC API                                           *selection-tools-api*
