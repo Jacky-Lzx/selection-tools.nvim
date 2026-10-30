@@ -41,6 +41,8 @@ function Preview:write(lines, ft, title, pos)
   end
   self.picker.preview_title = title or "Preview"
   self.displayed = true
+  self.displayed_item = self.item
+  self.picker:_restore_preview()
   self.picker:_draw_frame()
 end
 
@@ -83,6 +85,8 @@ function Preview:update(item, index)
       end)
       self.picker.preview_title = "Preview"
       self.displayed = true
+      self.displayed_item = self.item
+      self.picker:_restore_preview()
       self.picker:_draw_frame()
     else
       self:write({ "No preview" })

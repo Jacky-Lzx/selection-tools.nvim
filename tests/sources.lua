@@ -100,6 +100,54 @@ test("recent files retain MRU order, skip deleted files and deduplicate aliases"
   assert(ok, err)
 end)
 
+test("resume restores source objects, query, marks, cursor and preview scroll", function()
+  local a, b = { text = "alpha" }, { text = "beta" }
+  local lines = {}
+  for i = 1, 100 do
+    lines[i] = "line " .. i
+  end
+  local p = tools.open({
+    items = { a, b },
+    multi = true,
+    query = "a",
+    preview = { enabled = true },
+    format_item = function(item)
+      return item.text
+    end,
+    previewer = function(ctx)
+      ctx.set_lines(lines)
+    end,
+  })
+  p:move(1)
+  local current = p:current()
+  p:toggle()
+  assert(vim.wait(1000, function()
+    return vim.api.nvim_buf_line_count(p.preview_buf) == 100
+  end, 2))
+  p:scroll_preview(1)
+  local row = vim.api.nvim_win_get_cursor(p.preview_win)[1]
+  p:close()
+  p = tools.resume()
+  ready(p)
+  eq(p.query, "a")
+  assert(p:current() == current and p:selected()[1] == current)
+  assert(vim.wait(1000, function()
+    return vim.api.nvim_win_get_cursor(p.preview_win)[1] == row
+  end, 2))
+  p:close()
+  p = tools.grep({ cwd = fixture, query = "needle", debounce_ms = 0 })
+  ready(p)
+  local item = p:current()
+  p:toggle()
+  p:close()
+  p = tools.resume()
+  ready(p)
+  eq(p.query, "needle")
+  eq(p:current().file, item.file)
+  eq(#p:selected(), 1)
+  p:close()
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

@@ -85,7 +85,7 @@ end
 
 ---@return string[]
 function M.sources()
-  local names = {}
+  local names = { resume = true }
   for _, name in ipairs(builtins.names) do
     names[name] = true
   end
@@ -99,6 +99,9 @@ end
 ---@param opts? table
 ---@return selection_tools.Picker
 function M.pick(name, opts)
+  if name == "resume" then
+    return M.resume(opts)
+  end
   local source = sources[name]
   if not source then
     source = builtins[name]
@@ -106,7 +109,28 @@ function M.pick(name, opts)
   assert(source, "selection-tools: unknown source: " .. tostring(name))
   opts = opts or {}
   local spec = type(source) == "function" and source(opts) or source
-  return M.open(vim.tbl_deep_extend("force", {}, spec, opts, { source = name }))
+  return M.open(vim.tbl_deep_extend("force", {}, spec, opts, { source = name, source_opts = opts }))
+end
+
+function M.resume(opts)
+  local saved = require("selection_tools.state").get()
+  if not saved then
+    vim.notify("selection-tools: no picker to resume", vim.log.levels.INFO)
+    return
+  end
+  local picker
+  if saved.opts.live or saved.opts.resume_refresh or saved.loading then
+    saved.refreshed = true
+    local call_opts = vim.tbl_extend("force", {}, saved.opts.source_opts or {}, opts or {}, { query = saved.query })
+    picker = saved.opts.source and M.pick(saved.opts.source, call_opts)
+      or M.open(vim.tbl_extend("force", {}, saved.opts, call_opts))
+  else
+    local spec = vim.tbl_extend("force", {}, saved.opts, opts or {}, { items = saved.items, query = saved.query })
+    spec.finder = nil
+    picker = M.open(spec)
+  end
+  picker:restore(saved)
+  return picker
 end
 
 for _, name in ipairs(builtins.names) do

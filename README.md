@@ -215,3 +215,5 @@ python3 tests/tui.py
 - `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
 
 - `recent({ cwd, buffers = true })`：按最近使用顺序合并已列出的文件 buffer 和 `v:oldfiles`，跳过已删除文件并对路径别名去重；显式 `cwd` 可限定目录。
+
+- `resume()` / `:SelectionTools resume`：恢复上次 picker 的搜索源、查询、选中位置、多选标记和预览滚动。静态列表保留原始对象，实时或未完成的搜索重新加载；`resume = false` 可禁用单个 picker 的记录。

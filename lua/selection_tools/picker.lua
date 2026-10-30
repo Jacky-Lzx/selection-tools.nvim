@@ -168,6 +168,7 @@ function Picker:_filter()
     end
     self.matching, self.match_backend = false, used
     self.matches, self.positions, self.index, self.offset = matches, positions, 1, 0
+    self:_apply_restore()
     self:_render()
   end)
 end
@@ -240,6 +241,7 @@ function Picker:_render()
   self:_draw_frame()
   if self.preview and self.preview_win then
     self.preview:update(self:current())
+    self:_restore_preview()
   end
 end
 
@@ -285,6 +287,7 @@ function Picker:_find()
     vim.schedule(function()
       if current() then
         self.loading = false
+        self:_apply_restore()
         self:_render()
       end
     end)
@@ -434,6 +437,47 @@ function Picker:matcher_status()
   return { backend = self.match_backend or "none", pending = self.matching == true, error = self.matcher.last_error }
 end
 
+function Picker:_restore_preview()
+  if self.restore_view and self.preview and self.preview_win and self.preview.displayed_item == self:current() then
+    api.nvim_win_call(self.preview_win, function()
+      vim.fn.winrestview(self.restore_view)
+    end)
+    self.restore_view = nil
+  end
+end
+
+function Picker:_apply_restore()
+  local saved = self.restore_pending
+  if not saved or self.loading or self.matching then
+    return
+  end
+  local state = require("selection_tools.state")
+  self.restore_pending = nil
+  self.marks = {}
+  for _, entry in ipairs(self.entries) do
+    if
+      (saved.refreshed and saved.marked_keys[state.key(entry)]) or (not saved.refreshed and saved.marks[entry.index])
+    then
+      self.marks[entry.index] = true
+    end
+  end
+  for index, entry in ipairs(self.matches) do
+    if (saved.refreshed and state.key(entry) == saved.key) or (not saved.refreshed and entry.index == saved.index) then
+      self.index, self.offset, self.restore_view = index, saved.offset, saved.view
+      break
+    end
+  end
+end
+
+function Picker:restore(saved)
+  if self.closed then
+    return
+  end
+  self.restore_pending = saved
+  self:_apply_restore()
+  self:_render()
+end
+
 function Picker:confirm()
   if self.closed then
     return
@@ -449,6 +493,7 @@ function Picker:close(item, index, selected)
   if self.closed then
     return
   end
+  require("selection_tools.state").remember(self)
   self.closed = true
   self.matching = false
   self.matcher:cancel()
@@ -684,6 +729,7 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsCount", { default = true, link = "Comment" })
   self:_events()
   active = self
+  self.started = true
   self:_filter()
   if self.opts.finder then
     self:_find()
