@@ -107,6 +107,53 @@ test("grep highlights all regex hits with Unicode and tabs, then clears stale ra
   p:close()
 end)
 
+test("grep preview marks the result line and every hit without changing dirty source buffers", function()
+  local directory = fixture .. "/preview-focus"
+  vim.fn.mkdir(directory, "p")
+  local path = directory .. "/preview.lua"
+  local lines = { 'local first = "needle needle"', 'local second = "needle"' }
+  vim.fn.writefile(lines, path)
+  local ns = vim.api.nvim_get_namespaces().selection_tools_preview_focus
+  local function focus(p)
+    return vim.api.nvim_buf_get_extmarks(p.preview_buf, ns, 0, -1, { details = true })
+  end
+  local function displayed(p)
+    assert(vim.wait(2000, function()
+      return p.preview.displayed_item == p:current()
+    end, 1))
+  end
+  local p = tools.grep({ cwd = directory, query = "needle", debounce_ms = 0 })
+  ready(p)
+  displayed(p)
+  local marks = focus(p)
+  eq(#marks, 3)
+  for _, mark in ipairs(marks) do
+    eq(mark[2], 0)
+  end
+  p:move(1)
+  displayed(p)
+  marks = focus(p)
+  eq(#marks, 2)
+  for _, mark in ipairs(marks) do
+    eq(mark[2], 1)
+  end
+  p:close()
+  local buf = vim.fn.bufadd(path)
+  vim.fn.bufload(buf)
+  vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "changed since grep" })
+  local tick = vim.api.nvim_buf_get_changedtick(buf)
+  p = tools.grep({ cwd = directory, query = "needle", debounce_ms = 0 })
+  ready(p)
+  displayed(p)
+  marks = focus(p)
+  eq(#marks, 1)
+  eq(marks[1][4].hl_group, "SelectionToolsPreviewLine")
+  eq(vim.api.nvim_buf_get_changedtick(buf), tick)
+  eq(vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, {}), {})
+  p:close()
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
 test("projects combine explicit, recent and discovered roots without duplicates", function()
   local cwd, oldfiles = vim.fn.getcwd(), vim.v.oldfiles
   vim.fn.mkdir(fixture .. "/work/one/.git", "p")

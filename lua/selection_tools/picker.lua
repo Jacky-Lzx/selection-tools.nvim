@@ -850,6 +850,8 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
   api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
   api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })
+  api.nvim_set_hl(0, "SelectionToolsPreviewLine", { default = true, link = "CursorLine" })
+  api.nvim_set_hl(0, "SelectionToolsPreviewMatch", { default = true, link = "Search" })
   self:_events()
   active = self
   self.started = true

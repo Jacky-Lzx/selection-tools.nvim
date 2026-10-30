@@ -1,4 +1,5 @@
 local api, uv = vim.api, vim.uv
+local focus_ns = api.nvim_create_namespace("selection_tools_preview_focus")
 local Preview = {}
 Preview.__index = Preview
 
@@ -11,6 +12,45 @@ function Preview:cancel()
   if self.cancel_provider then
     pcall(self.cancel_provider)
     self.cancel_provider = nil
+  end
+end
+
+function Preview:_decorate(lines, pos)
+  api.nvim_buf_clear_namespace(self.buf, focus_ns, 0, -1)
+  if not pos or pos[1] < 1 or pos[1] > #lines or pos[1] > self.picker.opts.preview.max_lines then
+    return
+  end
+  local row = pos[1] - 1
+  if self.picker.opts.preview.highlight_line then
+    api.nvim_buf_set_extmark(self.buf, focus_ns, row, 0, {
+      end_row = row + 1,
+      end_col = 0,
+      hl_group = "SelectionToolsPreviewLine",
+      hl_eol = true,
+      priority = 90,
+    })
+  end
+  local item, line = self.item, lines[row + 1]
+  if not self.picker.opts.preview.highlight_matches or type(item) ~= "table" then
+    return
+  end
+  local length = #line
+  if item.code and item.code ~= line then
+    local prefix = line:sub(-#"…") == "…" and line:sub(1, -#"…" - 1) or nil
+    if not prefix or item.code:sub(1, #prefix) ~= prefix then
+      return
+    end
+    length = #prefix
+  end
+  for _, range in ipairs(item.line_matches or {}) do
+    local first, last = math.max(0, math.min(length, range[1])), math.max(0, math.min(length, range[2]))
+    if first < last then
+      api.nvim_buf_set_extmark(self.buf, focus_ns, row, first, {
+        end_col = last,
+        hl_group = "SelectionToolsPreviewMatch",
+        priority = 200,
+      })
+    end
   end
 end
 
@@ -51,6 +91,7 @@ function Preview:write(lines, ft, title, pos)
       vim.cmd("normal! zz")
     end)
   end
+  self:_decorate(lines, pos)
   self.picker.preview_title = title or "Preview"
   self.displayed = true
   self.displayed_item = self.item

@@ -74,6 +74,8 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsCount        Comment colors, with italic disabled
   SelectionToolsFileIcon     Comment
   SelectionToolsDirectoryIcon Directory
+  SelectionToolsPreviewLine  CursorLine
+  SelectionToolsPreviewMatch Search
 
 The selected-row background is a lower-priority text range, so query highlights
 remain visible even when Search only defines a background color. Count styling
@@ -157,7 +159,8 @@ selection.open(opts)
       layout, keys   Per-call overrides of setup options.
       multi          Enable marks; default false, true for files/buffers.
       preview        { enabled=false, max_size=1048576, max_lines=10000,
-                       max_line_length=1000 }. Built-in sources enable it.
+                       max_line_length=1000, highlight_line=true,
+                       highlight_matches=true }. Built-in sources enable it.
       preview_item   vim.ui.select-style function(item) returning a buffer
                      and optional pos. Caller buffers are displayed directly
                      without changing their options or deleting them.

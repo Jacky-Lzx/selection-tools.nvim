@@ -33,10 +33,12 @@ end
 
 function M.location(file, row, col, text, cwd)
   local prefix = ("%s:%d:%d: "):format(file, row, col + 1)
+  local code = (text or ""):gsub("[\r\n]+$", "")
   return {
     file = M.path(file, cwd),
     pos = { row, col },
-    text = prefix .. (text or ""):gsub("[\r\n]+$", ""),
+    text = prefix .. code,
+    code = code,
     content_offset = #prefix,
   }
 end
@@ -233,8 +235,9 @@ function M.rg(opts, ctx, pattern, transform)
                 ctx.cwd
               )
               item.match_text = sub and value(sub.match) or ""
-              item.match_ranges = {}
+              item.match_ranges, item.line_matches = {}, {}
               for _, match in ipairs(data.submatches) do
+                item.line_matches[#item.line_matches + 1] = { match.start, match["end"] }
                 item.match_ranges[#item.match_ranges + 1] = {
                   item.content_offset + match.start,
                   item.content_offset + match["end"],

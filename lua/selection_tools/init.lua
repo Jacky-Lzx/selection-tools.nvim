@@ -12,7 +12,14 @@ local defaults = {
     reverse = false,
     preview_height = 0.6,
   },
-  preview = { enabled = false, max_size = 1024 * 1024, max_lines = 10000, max_line_length = 1000 },
+  preview = {
+    enabled = false,
+    max_size = 1024 * 1024,
+    max_lines = 10000,
+    max_line_length = 1000,
+    highlight_line = true,
+    highlight_matches = true,
+  },
   history = { limit = 100, persist = false },
   matcher = {
     backend = "auto",
