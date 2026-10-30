@@ -265,12 +265,13 @@ function Picker:_render()
       end
     end
     local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
+    -- A text range respects match priorities; line_hl_group can mask bg-only Search.
     api.nvim_buf_set_extmark(
       self.list_buf,
       ns,
       row - 1,
       0,
-      { line_hl_group = "SelectionToolsSelected", priority = 100 }
+      { end_row = row, end_col = 0, hl_group = "SelectionToolsSelected", hl_eol = true, priority = 100 }
     )
     api.nvim_win_set_cursor(self.list_win, { row, 0 })
   else
@@ -776,6 +777,9 @@ function Picker:_mount(resolved)
     count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
   end
   count_hl.italic = false
+  if count_hl.cterm then
+    count_hl.cterm.italic = false
+  end
   api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
   api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
   api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })

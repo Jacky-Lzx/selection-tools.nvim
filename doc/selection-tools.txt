@@ -67,12 +67,17 @@ With persist=true, the default path is stdpath('state') followed by
 atomic, and empty queries are not recorded. Forward from the newest entry
 restores the query that was being edited before browsing history.
 
-Highlight groups (all use default links and may be overridden):
+Highlight groups (default links unless noted; may be overridden):
   SelectionToolsBorder       FloatBorder
   SelectionToolsSelected     Visual
   SelectionToolsMatch        Search
+  SelectionToolsCount        Comment colors, with italic disabled
   SelectionToolsFileIcon     Comment
   SelectionToolsDirectoryIcon Directory
+
+The selected-row background is a lower-priority text range, so query highlights
+remain visible even when Search only defines a background color. Count styling
+preserves its colors and disables italic in both RGB and terminal attributes.
 
 ===============================================================================
 2. USAGE                                              *selection-tools-usage*
