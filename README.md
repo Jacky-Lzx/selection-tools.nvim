@@ -221,3 +221,5 @@ python3 tests/tui.py
 - `todo_comments({ cwd, keywords })`：按 `KEYWORD:` 扫描 TODO 标记，默认包含 NOTE；若 todo-comments 已配置则读取其关键字与别名，也可显式限定关键字列表。独立使用不依赖 todo-comments 插件。
 
 - `registers({ registers, register = "+" })`：搜索非空寄存器并预览多行内容，确认后复制内容和寄存器类型到目标寄存器；默认避免主动读取 OSC 52 剪贴板。
+
+- `jumps()`：查看当前窗口的原生跳转列表，确认时按 jump list 索引执行原生前进/后退，保留后续跳转语义。

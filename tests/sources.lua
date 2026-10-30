@@ -183,6 +183,33 @@ test("register search previews multiline values and preserves register type when
   assert(ok, err)
 end)
 
+test("jump source navigates the native window jump list", function()
+  vim.cmd.enew()
+  local lines = {}
+  for i = 1, 30 do
+    lines[i] = "line " .. i
+  end
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  vim.cmd("clearjumps")
+  vim.cmd("normal! 1G")
+  vim.cmd("normal! 10G")
+  vim.cmd("normal! 20G")
+  local p = tools.jumps()
+  assert(#p.entries > 0)
+  local target
+  for i, entry in ipairs(p.matches) do
+    if entry.item.pos[1] == 10 then
+      p.index = i
+      target = entry.item
+      break
+    end
+  end
+  assert(target)
+  p:confirm()
+  eq(vim.api.nvim_win_get_cursor(0)[1], 10)
+  vim.bo.modified = false
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
