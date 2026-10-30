@@ -259,6 +259,18 @@ test("undo history previews a cloned tree and changes the original only on confi
   vim.bo.modified = false
 end)
 
+test("search history restores the search register and searches the original window", function()
+  vim.cmd.enew()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "start", "history_target" })
+  vim.fn.histadd("/", "history_target")
+  vim.api.nvim_win_set_cursor(0, { 1, 0 })
+  local p = tools.search_history({ query = "history_target" })
+  p:confirm()
+  eq(vim.fn.getreg("/"), "history_target")
+  eq(vim.api.nvim_win_get_cursor(0), { 2, 0 })
+  vim.bo.modified = false
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

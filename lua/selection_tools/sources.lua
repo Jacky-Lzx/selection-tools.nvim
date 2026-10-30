@@ -1,5 +1,17 @@
 local M = {
-  names = { "files", "buffers", "grep", "projects", "recent", "todo_comments", "registers", "jumps", "marks", "undo" },
+  names = {
+    "files",
+    "buffers",
+    "grep",
+    "projects",
+    "recent",
+    "todo_comments",
+    "registers",
+    "jumps",
+    "marks",
+    "undo",
+    "search_history",
+  },
 }
 
 return setmetatable(M, {
