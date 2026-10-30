@@ -213,3 +213,5 @@ python3 tests/tui.py
 新增搜索源测试：`nvim --headless -u NONE -n -i NONE -l tests/sources.lua`。
 
 - `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
+
+- `recent({ cwd, buffers = true })`：按最近使用顺序合并已列出的文件 buffer 和 `v:oldfiles`，跳过已删除文件并对路径别名去重；显式 `cwd` 可限定目录。

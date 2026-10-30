@@ -85,6 +85,21 @@ test("projects combine explicit, recent and discovered roots without duplicates"
   assert(ok, err)
 end)
 
+test("recent files retain MRU order, skip deleted files and deduplicate aliases", function()
+  local oldfiles = vim.v.oldfiles
+  vim.fn.writefile({ "recent" }, fixture .. "/recent.txt")
+  vim.v.oldfiles = { fixture .. "/recent.txt", fixture .. "/missing.txt", fixture .. "/sub/../recent.txt" }
+  local ok, err = pcall(function()
+    local p = tools.recent({ buffers = false, cwd = fixture })
+    eq(#p.entries, 1)
+    eq(p:current().file, vim.uv.fs_realpath(fixture .. "/recent.txt"))
+    p:confirm()
+    eq(vim.api.nvim_buf_get_name(0), vim.uv.fs_realpath(fixture .. "/recent.txt"))
+  end)
+  vim.v.oldfiles = oldfiles
+  assert(ok, err)
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
