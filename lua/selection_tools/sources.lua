@@ -21,6 +21,7 @@ local M = {
     "man",
     "spelling",
     "highlights",
+    "icons",
   },
 }
 

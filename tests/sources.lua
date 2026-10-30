@@ -447,6 +447,23 @@ test("highlights preview resolved attributes and apply the actual highlight grou
   eq(vim.api.nvim_get_hl(0, { name = "SelectionSourceHighlight" }).fg, 0x123456)
 end)
 
+test("icons insert the selected glyph and support local custom catalogs offline", function()
+  vim.cmd.enew()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "a" })
+  local p = tools.icons({ icons = { { icon = "λ", name = "lambda" } }, query = "lambda" })
+  ready(p)
+  eq(#p.matches, 1)
+  p:confirm()
+  eq(vim.api.nvim_get_current_line(), "aλ")
+  vim.bo.modified = false
+  local path = fixture .. "/icons.json"
+  vim.fn.writefile({ vim.json.encode({ { "🦀", "rust crab" } }) }, path)
+  p = tools.icons({ icon_sources = {}, devicons = false, custom_sources = { test = path }, query = "rust crab" })
+  ready(p)
+  eq(p:current().icon, "🦀")
+  p:close()
+end)
+
 vim.fn.delete(fixture, "rf")
 print(("%d source tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")

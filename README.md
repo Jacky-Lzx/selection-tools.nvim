@@ -249,3 +249,5 @@ python3 tests/tui.py
 - `spelling()`：在原窗口替换光标处单词，保留其他同名词；原文发生变化后拒绝过期替换。沿用原 spelling 的上方输入、小窗口布局。
 
 - `highlights()`：搜索高亮组，预览真实样式、链接和解析后的颜色属性；确认关闭，C-y 可复制名称。
+
+- `icons()`：搜索 Nerd Fonts、Emoji、可选 devicons 和内置符号，确认后插入原 buffer。首次异步下载并缓存公开字形目录；icon_sources={} 禁用下载，icons 或 custom_sources 可提供本地目录。
