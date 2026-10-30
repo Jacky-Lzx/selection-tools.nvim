@@ -15,6 +15,7 @@ local defaults = {
   },
   preview = {
     enabled = false,
+    providers = {},
     max_size = 1024 * 1024,
     max_lines = 10000,
     max_line_length = 1000,

@@ -114,6 +114,30 @@ require("selection_tools").grep({
 
 也可调用 `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })`，或在 `files()` / `grep()` 的调用选项中指定。
 
+## image-tools 图片联动
+
+可选联动使用 image-tools.nvim 的公共 `supports()` / `render()` API，图片转换、缓存和终端渲染由 image-tools 负责；本插件提供预览窗口和生命周期。不会调用 Snacks.image，也不内置 chafa 或其他图像后端。
+
+```lua
+require("selection_tools").setup({
+  preview = {
+    providers = { require("selection_tools.integrations.image_tools").provider() },
+  },
+})
+```
+
+在 lazy.nvim 尚未加载插件的 `opts` 表中，可使用延迟回调：`providers = { function(ctx) return require("selection_tools.integrations.image_tools").preview(ctx) end }`。
+
+适配器仅在遇到 PNG、SVG、PDF 等候选时加载 image-tools，普通文本沿用原预览，已加载的未保存文本优先。图片保留比例适配预览区；切换/关闭会释放本次视图，`F3` 及窗口缩放会更新已有视图并复用像素缓存。需要包含嵌入式 API 的 image-tools 版本和其支持的终端图像能力，错误会显示在预览区。联动默认不启用，也不改变 `vim.ui.select` 的预览优先级。
+
+`provider({ page = 2, upscale = false })` 可指定 PDF 页码及放大策略。`extensions` 可提供额外的扩展名映射（如 `{ png=true, pdf=true }`）作为按需加载的前置筛选；最终格式能力仍由 image-tools 判断。
+
+## 通用预览 provider
+
+`preview.providers` 按顺序调用 `function(ctx)`；返回 `false` / `nil` 表示交给下一个 provider 或默认文件预览。返回 `true`、取消函数，或带 `close()` / 可选 `resize()` 的对象表示接管。调用者提供的 `preview_item` 和搜索源自带的 `previewer` 保留优先级。
+
+`ctx` 包含 `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`。`ctx.paint(draw, { title = ... })` 在一次受有效期检查的主线程事务中调用 `draw(buf,win)`，支持同步写行和添加 extmark，自动恢复 buffer 的可写标志。主线程调用同步完成；fast callback 调用会整体调度，过期工作被丢弃。图像占位符应通过 `paint` 绘制，避免在异步 `set_lines` 后立即添加高亮。缩放调用返回对象的 `resize()`，换项/关闭调用取消函数或 `close()`。
+
 ## 流式全文搜索
 
 Grep 边接收 ripgrep JSON 边展示结果，分批解析时保持输入可响应；追加结果保留当前条目和多选标记。达到 `limit`（默认 10000）、`max_output`（默认 32 MiB）或 `max_line_bytes`（默认 1 MiB）后停止进程，右下角显示 `Limit reached`，具体原因可读取 `picker.truncated`。达到结果上限表示“上限已到”，不代表总命中数已知。新查询、切换选项及关闭窗口会取消旧进程并丢弃迟到的数据。
@@ -271,6 +295,9 @@ nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
+nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
+# 可选：真实 image-tools API 和媒体/缓存联动，Kitty 应答由测试模拟
+IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py
 ```
 

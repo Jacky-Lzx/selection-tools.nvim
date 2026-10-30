@@ -799,6 +799,9 @@ function Picker:resize()
     end
   end
   self:_render()
+  if self.preview and self.preview_win then
+    self.preview:resize()
+  end
 end
 
 function Picker:expand_preview()

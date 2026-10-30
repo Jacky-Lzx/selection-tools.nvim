@@ -35,6 +35,8 @@ def run_case(case):
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
+        if case == "image_tools_tui":
+            actions.update(expand=b"\x1bOR", type_text=b"text", clear_text=b"\x15", move_again=b"\x0e", pdf=b"\x0e")
         if case == "workflows_tui":
             actions.update(regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
                            scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11", expand=b"\x1bOR", collapse=b"\x1bOR", details=b"\x1bOQ", details_close=b"q", split=b"\x16")
@@ -98,6 +100,10 @@ if __name__ == "__main__":
     run_case("grep_columns_tui")
     run_case("workflows_tui")
     run_case("syntax_tui")
+    if os.environ.get("IMAGE_TOOLS_ROOT"):
+        run_case("image_tools_tui")
+    else:
+        print("SKIP image-tools terminal integration (set IMAGE_TOOLS_ROOT)")
     if shutil.which("sk"):
         run_case("skim_tui")
     else:

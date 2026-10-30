@@ -4,11 +4,23 @@ local Preview = {}
 Preview.__index = Preview
 
 function Preview.new(picker, buf)
+  vim.bo[buf].modifiable = false
   return setmetatable({ picker = picker, buf = buf, generation = 0 }, Preview)
+end
+
+function Preview:resize()
+  local provider = self.provider
+  if type(provider) == "table" and type(provider.resize) == "function" then
+    local ok, err = pcall(provider.resize, provider)
+    if not ok then
+      self:write({ "Preview resize error: " .. tostring(err) })
+    end
+  end
 end
 
 function Preview:cancel()
   self.generation = self.generation + 1
+  self.provider = nil
   if self.cancel_provider then
     pcall(self.cancel_provider)
     self.cancel_provider = nil
@@ -146,33 +158,113 @@ function Preview:update(item, index)
     end
     return
   end
-  if opts.previewer then
-    local ok, cancel = pcall(opts.previewer, {
-      item = item,
-      index = index,
-      buf = self.buf,
-      win = self.picker.preview_win,
-      is_cancelled = function()
-        return not current()
-      end,
-      set_lines = deliver,
-    })
-    if not ok then
-      self:write({ "Preview error: " .. tostring(cancel):gsub("[\r\n]", " ") })
-    elseif type(cancel) == "function" then
-      if current() then
-        self.cancel_provider = cancel
-      else
-        pcall(cancel)
-      end
-    end
-    return
-  end
   local path = type(item) == "table" and item.file or nil
+  if not path and buf and api.nvim_buf_is_valid(buf) then
+    path = api.nvim_buf_get_name(buf)
+  end
+  if path and not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
+    path = vim.fs.joinpath(opts.cwd or vim.fn.getcwd(), path)
+  end
   if not buf and path then
     local known = vim.fn.bufnr(path)
     if known >= 0 and api.nvim_buf_is_loaded(known) then
       buf = known
+    end
+  end
+  local ctx = {
+    item = item,
+    index = index,
+    path = path,
+    source_buf = buf,
+    buf = self.buf,
+    win = self.picker.preview_win,
+    is_cancelled = function()
+      return not current()
+    end,
+    set_lines = deliver,
+  }
+  -- Paint is one guarded transaction, including extmarks. It never clears a
+  -- renderer's namespaces after drawing or queues a separate line replacement.
+  ctx.paint = function(draw, metadata)
+    local function paint()
+      local win = ctx.win
+      if
+        not current()
+        or not api.nvim_win_is_valid(win)
+        or not api.nvim_buf_is_valid(self.buf)
+        or api.nvim_win_get_buf(win) ~= self.buf
+      then
+        return false
+      end
+      pcall(vim.treesitter.stop, self.buf)
+      vim.bo[self.buf].filetype, vim.bo[self.buf].syntax = "", ""
+      api.nvim_buf_clear_namespace(self.buf, focus_ns, 0, -1)
+      local writable, readonly = vim.bo[self.buf].modifiable, vim.bo[self.buf].readonly
+      vim.bo[self.buf].readonly, vim.bo[self.buf].modifiable = false, true
+      local ok, err = pcall(draw, self.buf, win)
+      if api.nvim_buf_is_valid(self.buf) then
+        vim.bo[self.buf].modifiable, vim.bo[self.buf].readonly = writable, readonly
+      end
+      if not ok then
+        error(err)
+      end
+      if
+        not current()
+        or not api.nvim_buf_is_valid(self.buf)
+        or not api.nvim_win_is_valid(win)
+        or api.nvim_win_get_buf(win) ~= self.buf
+      then
+        return false
+      end
+      self.displayed, self.displayed_item = true, item
+      self.picker.preview_title = metadata and metadata.title or "Preview"
+      api.nvim_win_set_cursor(win, { 1, 0 })
+      api.nvim_win_call(win, function()
+        vim.fn.winrestview({ topline = 1, leftcol = 0 })
+      end)
+      self.picker:_draw_frame()
+      return true
+    end
+    if vim.in_fast_event() then
+      vim.schedule(function()
+        if current() then
+          paint()
+        end
+      end)
+      return true
+    end
+    return paint()
+  end
+  local function provide(provider, legacy)
+    local ok, result = pcall(provider, ctx)
+    if not ok then
+      self:write({ "Preview error: " .. tostring(result):gsub("[\r\n]", " ") })
+      return true
+    end
+    if result == nil or result == false then
+      return legacy == true
+    end
+    local function close()
+      if type(result) == "function" then
+        result()
+      elseif type(result) == "table" and type(result.close) == "function" then
+        result:close()
+      end
+    end
+    if current() then
+      self.provider, self.cancel_provider = result, close
+    else
+      pcall(close)
+    end
+    return true
+  end
+  if opts.previewer then
+    provide(opts.previewer, true)
+    return
+  end
+  for _, provider in ipairs(opts.preview.providers or {}) do
+    if provide(provider) then
+      return
     end
   end
   if buf and api.nvim_buf_is_loaded(buf) then
