@@ -1,5 +1,50 @@
 local M = {}
 
+-- Prefer explicit marks; otherwise export the complete filtered result set.
+function M.export(picker, location, all)
+  if picker.closed or picker.matching then
+    return
+  end
+  local items = not all and picker:selected() or {}
+  if #items == 0 then
+    for _, entry in ipairs(picker.matches) do
+      items[#items + 1] = entry.item
+    end
+  end
+  local entries = {}
+  for _, item in ipairs(items) do
+    if type(item) == "table" and (item.file or item.bufnr or item.buf) then
+      local pos = item.pos or { 1, 0 }
+      entries[#entries + 1] = {
+        filename = item.file,
+        bufnr = item.bufnr or item.buf,
+        lnum = pos[1],
+        col = (pos[2] or 0) + 1,
+        text = tostring(item.code or item.text or ""):gsub("[\r\n]", " "),
+      }
+    end
+  end
+  if #entries == 0 then
+    vim.notify("No file locations to export", vim.log.levels.INFO)
+    return
+  end
+  if location and not vim.api.nvim_win_is_valid(picker.origin_win) then
+    vim.notify("The original window is no longer available", vim.log.levels.WARN)
+    return
+  end
+  local list = { title = (picker.opts.prompt or "Selection") .. ": " .. picker.query, items = entries }
+  if location then
+    vim.fn.setloclist(picker.origin_win, {}, " ", list)
+  else
+    vim.fn.setqflist({}, " ", list)
+  end
+  picker:close()
+  if location then
+    vim.api.nvim_set_current_win(picker.origin_win)
+  end
+  vim.cmd(location and "lopen" or "copen")
+end
+
 local function value(item)
   if type(item) ~= "table" then
     return tostring(item)

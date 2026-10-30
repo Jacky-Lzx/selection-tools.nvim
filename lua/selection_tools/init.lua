@@ -37,6 +37,8 @@ local defaults = {
     close = { "<Esc>", "<C-c>" },
     next = { "<C-n>", "<Down>" },
     previous = { "<C-p>", "<Up>" },
+    quickfix = { "<C-q>" },
+    loclist = { "<C-l>" },
   },
 }
 

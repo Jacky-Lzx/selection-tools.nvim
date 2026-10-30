@@ -109,6 +109,11 @@ matching states are appended after the numeric indicator. Internal dividers join
 outer border and do not display preview filenames. Previews use absolute line
 numbers.
 
+
+Result exports: CTRL-Q sends marked items, or all filtered results without marks,
+to Quickfix. CTRL-L targets the calling window location list. Only file/buffer
+locations are exported. keys.quickfix_all and keys.loclist_all always export all.
+
 File/buffer sources enable preview and multiple selection. Marked files are
 added to the buffer list; confirmation displays the first marked file.
 The grep source performs live full-text search using ripgrep JSON output.

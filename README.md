@@ -100,6 +100,10 @@ require("selection_tools").grep({
 
 `syntax.enabled = false` 关闭条目代码配色。文档缓存至少容纳可见行数量，避免多文件列表反复解析。预览中的当前结果行使用 `SelectionToolsPreviewLine`（默认 `CursorLine`），匹配内容使用 `SelectionToolsPreviewMatch`（默认 `Search`）；两者可分别关闭。预览切换会同步更新这些标记；如果 buffer 正文已与磁盘搜索结果不同，则不套用过期的匹配范围。
 
+## 结果操作
+
+`<C-q>` 将多选项（未多选时为全部过滤结果）发送到 Quickfix，`<C-l>` 发送到调用窗口的 Location list，并打开列表。只有文件位置条目会被导出；行列号与原始代码内容保留。可将 `keys.quickfix_all` / `keys.loclist_all` 配置为始终导出全部过滤结果。
+
 ## 匹配后端
 
 ```lua
@@ -251,6 +255,7 @@ nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
+nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 python3 tests/tui.py
 ```
 
