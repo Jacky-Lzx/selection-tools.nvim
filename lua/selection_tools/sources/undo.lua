@@ -68,17 +68,13 @@ return function()
         vim.cmd("silent undo " .. ctx.item.seq)
       end)
       local target = vim.api.nvim_buf_get_lines(clone, 0, -1, false)
-      local diff = vim.diff(
-        table.concat(current, "\n") .. "\n",
-        table.concat(target, "\n") .. "\n",
-        { result_type = "unified", ctxlen = 3 }
-      )
-      ctx.set_lines(
-        diff == "" and { "Current version (no changes)" }
-          or vim.split("--- current\n+++ seq " .. ctx.item.seq .. "\n" .. diff, "\n", { plain = true }),
-        "diff",
-        "Undo preview"
-      )
+      local available, diff = pcall(require, "git_tools.diff")
+      if not available then
+        ctx.set_lines(target, vim.bo[origin.buf].filetype, "Undo snapshot · install git-tools.nvim for diff")
+        return
+      end
+      local patch = diff.unified(current, target, { old_path = "current", new_path = "seq " .. ctx.item.seq })
+      ctx.set_lines(#patch == 0 and { "Current version (no changes)" } or patch, "diff", "Undo preview")
     end,
     on_choice = function(item)
       if item then

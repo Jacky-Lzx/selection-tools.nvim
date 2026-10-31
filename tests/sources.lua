@@ -1,4 +1,7 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
+if vim.env.GIT_TOOLS_DIR then
+  vim.opt.rtp:prepend(vim.env.GIT_TOOLS_DIR)
+end
 vim.o.swapfile = false
 local tools = require("selection_tools")
 local passed, failed = 0, 0
@@ -345,8 +348,12 @@ test("undo history previews a cloned tree and changes the original only on confi
   end
   assert(seq, "missing prior undo sequence")
   p:_render()
+  local diff_available = package.loaded["git_tools.diff"] ~= nil
   assert(vim.wait(1000, function()
-    return vim.bo[p.preview_buf].filetype == "diff"
+    if diff_available then
+      return vim.bo[p.preview_buf].filetype == "diff"
+    end
+    return vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1] == "first"
   end, 2))
   eq(vim.api.nvim_buf_get_lines(original, 0, -1, false), lines)
   eq(vim.api.nvim_buf_get_changedtick(original), tick)

@@ -88,18 +88,9 @@ local late = api.nvim_create_buf(false, true)
 assert(not ctx.set_buffer(late, { owned = true }) and not api.nvim_buf_is_valid(late))
 api.nvim_buf_delete(borrowed, { force = true })
 
-local provider = require("selection_tools.providers.diff")
-p = tools.open({
-  items = { { lines = { "--- a", "+++ a", "@@ -1 +1 @@", "-old", "+new" } } },
-  resume = false,
-  preview = { enabled = true, providers = { provider.provider({ backend = "vim" }) } },
-})
-assert(vim.wait(500, function()
-  return vim.bo[p.preview_buf].filetype == "diff"
-end, 5))
-assert(api.nvim_buf_get_lines(p.preview_buf, 4, 5, false)[1] == "+new")
-p:close()
-print(
-  "selection transactions: guards, async cancellation, close reasons, owned ANSI frames and shared diff provider passed"
+print("selection transactions: guards, async cancellation, close reasons, owned ANSI frames passed")
+assert(
+  not package.loaded.git_tools and not package.loaded["git_tools.diff"],
+  "selection transactions need no diff engine"
 )
 vim.cmd("qa!")

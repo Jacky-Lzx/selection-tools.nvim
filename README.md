@@ -148,7 +148,7 @@ require("selection_tools").setup({
 原有单参数回调兼容；仍先清理窗口、恢复焦点，再调用 `on_close` 和 `on_choice`。
 事务型选择器应设置 `resume = false`，避免恢复绑定旧请求的回调。
 
-### 共用 diff 渲染
+### 外部 diff provider
 
 ```lua
 require("selection_tools").open({
@@ -159,7 +159,7 @@ require("selection_tools").open({
   preview = {
     enabled = true,
     providers = {
-      require("selection_tools.providers.diff").provider({
+      require("git_tools.integrations.selection").diff({
         backend = "vim", -- 或 delta；不依赖 Snacks
         delta = { command = "delta", args = {}, timeout = 2000 },
       }),
@@ -174,10 +174,12 @@ require("selection_tools").open({
 })
 ```
 
-provider 接收已经计算好的 unified diff，不解释 LSP WorkspaceEdit。
-也可用 `diff.render(ctx, lines, opts, valid)` 渲染异步获得的内容，返回带
-`close()` / `resize()` 的句柄。渲染处理 delta 的超时、失败回退、字面 argv、
-取消和过期结果；缩放会按新宽度重新渲染。`opts.cwd` 或 `item.root` 指定进程目录。
+diff 生成和原生/delta 渲染由独立的 `git-tools.nvim` 提供。使用此示例前，
+将 git-tools.nvim 加入 runtimepath；普通选择窗口无需安装或加载它。
+原 `selection_tools.providers.diff` 已迁出：provider 改用
+`git_tools.integrations.selection.diff(opts)`，直接渲染改用
+`git_tools.diff.render(ctx, lines, opts, valid)`。直接调用时显式传入 `opts.cwd`。
+selection-tools 保留窗口、焦点、确认和预览帧生命周期；调用方负责变更校验和应用。
 
 `ctx.set_buffer(buf, { owned = true, title = "Preview" })` 可接管新预览帧。
 旧帧保留到新帧就绪，之后释放；窗口关闭也会释放拥有的 buffer。
@@ -350,7 +352,6 @@ nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
-nvim --headless -u NONE -n -i NONE -l tests/diff.lua
 # 可选：真实 image-tools API 和媒体/缓存联动，Kitty 应答由测试模拟
 IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py
@@ -376,7 +377,7 @@ python3 tests/tui.py
 
 - `marks()`：合并当前 buffer 的局部标记与全局标记，显示并预览精确位置，确认后跳转。
 
-- `undo()`：搜索原生撤销树（含分支），在独立克隆中生成版本差异预览；仅确认时更改原 buffer，若原内容已改变则拒绝套用旧状态。临时撤销文件和克隆在关闭时清理。
+- `undo()`：搜索原生撤销树（含分支），在独立克隆中读取历史内容；安装 git-tools.nvim 时使用其 diff API 预览差异，否则显示完整历史快照；仅确认时更改原 buffer，若原内容已改变则拒绝套用旧状态。临时撤销文件和克隆在关闭时清理。
 
 - `search_history()`：搜索历史选择会恢复搜索寄存器，并在原窗口执行所选搜索。
 

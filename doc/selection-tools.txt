@@ -497,16 +497,15 @@ on_close(picker,outcome) receives reason="confirm" or "cancel"; existing callbac
 remain compatible. Cleanup and focus restoration precede on_close and on_choice.
 Use resume=false for callbacks tied to a particular transaction.
 
-DIFF PROVIDER                                        *selection-tools-diff*
+EXTERNAL DIFF PROVIDER                              *selection-tools-diff*
 
-require("selection_tools.providers.diff").provider(opts) creates a preview
-provider for items with unified diff lines in item.lines. opts.lines(item) can
-provide another source. backend="vim" (default) or "delta" controls rendering.
-delta={command="delta",args={},timeout=2000} configures optional ANSI rendering;
-missing/failed/timed-out delta falls back to native diff. cwd or item.root is
-used for the process directory. Arguments are passed literally without a shell.
-render(ctx,lines,opts,valid) returns a handle with close()/resize() for callers
-that obtain content asynchronously. Cancelled or obsolete output is discarded.
+Diff generation and native/delta rendering are provided by git-tools.nvim.
+Replace selection_tools.providers.diff.provider(opts) with
+require("git_tools.integrations.selection").diff(opts). Direct render callers use
+require("git_tools.diff").render(ctx,lines,opts,valid) with an explicit opts.cwd.
+Install git-tools on runtimepath for these optional calls. Ordinary selection
+and preview APIs do not depend on or load git-tools. Undo history optionally
+uses its unified diff generator; without git-tools it shows the full snapshot.
 
 ctx.set_buffer(buf,{owned=true,title="Preview"}) adopts a ready frame. The old
 owned frame is deleted only after replacement, or at picker close. Borrowed
