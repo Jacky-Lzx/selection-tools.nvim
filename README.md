@@ -134,6 +134,59 @@ require("selection_tools").setup({
 
 ## 通用预览 provider
 
+### 确认前校验与事务窗口
+
+`open()` / `select()` 支持 `before_confirm(ctx)`。返回 `true` 确认并关闭，
+返回 `false, message` 拒绝并保留窗口；校验抛错也会显示错误并保留窗口。
+返回 `nil` 表示异步处理，之后在主线程调用 `ctx.accept()` 或 `ctx.reject(message)`。
+`ctx` 包含 `picker/item/index/selected/is_cancelled()`；确认一次后不再接受重复确认。
+切换条目、改变查询、替换候选或关闭窗口，会使未完成确认失效；迟到的
+`accept()` 返回 `false`。异步回调需要先检查 `is_cancelled()`，并用 `vim.schedule`
+从 fast callback 返回主线程。
+
+`on_close(picker, outcome)` 的 `outcome.reason` 为 `"confirm"` 或 `"cancel"`，
+原有单参数回调兼容；仍先清理窗口、恢复焦点，再调用 `on_close` 和 `on_choice`。
+事务型选择器应设置 `resume = false`，避免恢复绑定旧请求的回调。
+
+### 共用 diff 渲染
+
+```lua
+require("selection_tools").open({
+  prompt = "Review changes",
+  items = { { text = "main.lua · 1 edit", lines = unified_diff_lines } },
+  format_item = function(item) return item.text end,
+  resume = false,
+  preview = {
+    enabled = true,
+    providers = {
+      require("selection_tools.providers.diff").provider({
+        backend = "vim", -- 或 delta；不依赖 Snacks
+        delta = { command = "delta", args = {}, timeout = 2000 },
+      }),
+    },
+  },
+  before_confirm = function(ctx)
+    return validate_changes(ctx.item) -- true 或 false, message
+  end,
+  on_choice = function(item)
+    if item then apply_changes() end
+  end,
+})
+```
+
+provider 接收已经计算好的 unified diff，不解释 LSP WorkspaceEdit。
+也可用 `diff.render(ctx, lines, opts, valid)` 渲染异步获得的内容，返回带
+`close()` / `resize()` 的句柄。渲染处理 delta 的超时、失败回退、字面 argv、
+取消和过期结果；缩放会按新宽度重新渲染。`opts.cwd` 或 `item.root` 指定进程目录。
+
+`ctx.set_buffer(buf, { owned = true, title = "Preview" })` 可接管新预览帧。
+旧帧保留到新帧就绪，之后释放；窗口关闭也会释放拥有的 buffer。
+省略 `owned` 时 buffer 始终归调用方所有，不会删除。过期的拥有帧会被清理。
+通用 provider 的 `ctx` 还包含 `picker`；`paint()` 和 `set_lines()` 会安全切回
+内部文本 buffer，支持在 ANSI、图片和普通文本之间切换。
+
+### 自定义 provider
+
 `preview.providers` 按顺序调用 `function(ctx)`；返回 `false` / `nil` 表示交给下一个 provider 或默认文件预览。返回 `true`、取消函数，或带 `close()` / 可选 `resize()` 的对象表示接管。调用者提供的 `preview_item` 和搜索源自带的 `previewer` 保留优先级。
 
 `ctx` 包含 `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`。`ctx.paint(draw, { title = ... })` 在一次受有效期检查的主线程事务中调用 `draw(buf,win)`，支持同步写行和添加 extmark，自动恢复 buffer 的可写标志。主线程调用同步完成；fast callback 调用会整体调度，过期工作被丢弃。图像占位符应通过 `paint` 绘制，避免在异步 `set_lines` 后立即添加高亮。缩放调用返回对象的 `resize()`。换项时若对象提供 `retain()`，可返回一个只保留已就绪显示的句柄，通过下次 `ctx.previous` 传递；`ctx.has_preview` 表示已有内容。新 `paint` / `set_lines` 完成后或取消时关闭保留句柄；不支持保留的 provider 仍立即调用取消函数或 `close()`。
@@ -296,6 +349,8 @@ nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
+nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
+nvim --headless -u NONE -n -i NONE -l tests/diff.lua
 # 可选：真实 image-tools API 和媒体/缓存联动，Kitty 应答由测试模拟
 IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py

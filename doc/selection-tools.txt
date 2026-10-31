@@ -484,4 +484,35 @@ File locations use item.file/item.bufnr and item.pos={1-based row, 0-based byte
 column}. item.search is an optional literal preview anchor (used by help tags).
 TODO and grep results expose file/pos and can use the standard file preview.
 
+
+TRANSACTION PICKERS                                  *selection-tools-transactions*
+
+before_confirm(ctx) runs before closing a choice. Return true to accept,
+false,message to reject and keep the picker open, or nil to finish asynchronously.
+ctx provides picker, item, index, selected, is_cancelled(), accept(), reject(msg).
+accept() returns false for obsolete/closed confirmations. Moving away (even if
+returning), changing queries/items, or closing invalidates pending acceptance.
+Schedule fast callbacks onto the main thread before accepting or rejecting.
+on_close(picker,outcome) receives reason="confirm" or "cancel"; existing callbacks
+remain compatible. Cleanup and focus restoration precede on_close and on_choice.
+Use resume=false for callbacks tied to a particular transaction.
+
+DIFF PROVIDER                                        *selection-tools-diff*
+
+require("selection_tools.providers.diff").provider(opts) creates a preview
+provider for items with unified diff lines in item.lines. opts.lines(item) can
+provide another source. backend="vim" (default) or "delta" controls rendering.
+delta={command="delta",args={},timeout=2000} configures optional ANSI rendering;
+missing/failed/timed-out delta falls back to native diff. cwd or item.root is
+used for the process directory. Arguments are passed literally without a shell.
+render(ctx,lines,opts,valid) returns a handle with close()/resize() for callers
+that obtain content asynchronously. Cancelled or obsolete output is discarded.
+
+ctx.set_buffer(buf,{owned=true,title="Preview"}) adopts a ready frame. The old
+owned frame is deleted only after replacement, or at picker close. Borrowed
+buffers are not deleted. Late owned frames are discarded and deleted. set_lines
+and paint switch back to the internal text buffer and release the owned frame.
+ctx.picker provides the owner. Preview providers otherwise keep the existing
+close/resize/retain protocol.
+
 vim:tw=78:ts=8:ft=help:norl:

@@ -48,9 +48,20 @@ function Preview:cancel(preserve)
   end
   if not preserve then
     self:_release_retained(false)
+    self:_release_buffer()
   end
   if self.retained and self.retained.closed then
     self.retained = nil
+  end
+end
+
+-- Caller buffers stay caller-owned; adopted renderer frames live until a new
+-- frame is ready or the picker closes, including while another provider loads.
+function Preview:_release_buffer(keep, borrowed)
+  local buf = self.owned_buf
+  self.owned_buf = keep
+  if buf and buf ~= self.buf and buf ~= keep and buf ~= borrowed and api.nvim_buf_is_valid(buf) then
+    pcall(api.nvim_buf_delete, buf, { force = true })
   end
 end
 
@@ -137,6 +148,7 @@ function Preview:write(lines, ft, title, pos)
   self.picker:_restore_preview()
   self.picker:_draw_frame()
   self:_release_retained(false)
+  self:_release_buffer()
 end
 
 function Preview:update(item, index)
@@ -171,6 +183,7 @@ function Preview:update(item, index)
     elseif result and result.buf and api.nvim_buf_is_valid(result.buf) then
       -- Display caller buffers without copying highlights or changing their options.
       api.nvim_win_set_buf(self.picker.preview_win, result.buf)
+      self:_release_buffer()
       local row = math.max(1, math.min(result.pos and result.pos[1] or 1, api.nvim_buf_line_count(result.buf)))
       local line = api.nvim_buf_get_lines(result.buf, row - 1, row, false)[1] or ""
       api.nvim_win_set_cursor(self.picker.preview_win, { row, math.min(result.pos and result.pos[2] or 0, #line) })
@@ -201,6 +214,7 @@ function Preview:update(item, index)
     end
   end
   local ctx = {
+    picker = self.picker,
     item = item,
     index = index,
     previous = self.retained,
@@ -214,19 +228,38 @@ function Preview:update(item, index)
     end,
     set_lines = deliver,
   }
+  ctx.set_buffer = function(buf, metadata)
+    metadata = metadata or {}
+    local function show()
+      if not current() or not api.nvim_buf_is_valid(buf) or not api.nvim_win_is_valid(ctx.win) then
+        if metadata.owned and buf ~= self.buf and api.nvim_buf_is_valid(buf) then
+          api.nvim_buf_delete(buf, { force = true })
+        end
+        return false
+      end
+      api.nvim_win_set_buf(ctx.win, buf)
+      self:_release_buffer(metadata.owned and buf or nil, buf)
+      self.displayed, self.displayed_item = true, item
+      self.picker.preview_title = metadata.title or "Preview"
+      self.picker:_draw_frame()
+      self:_release_retained(false)
+      return true
+    end
+    if vim.in_fast_event() then
+      vim.schedule(show)
+      return true
+    end
+    return show()
+  end
   -- Paint is one guarded transaction, including extmarks. It never clears a
   -- renderer's namespaces after drawing or queues a separate line replacement.
   ctx.paint = function(draw, metadata)
     local function paint()
       local win = ctx.win
-      if
-        not current()
-        or not api.nvim_win_is_valid(win)
-        or not api.nvim_buf_is_valid(self.buf)
-        or api.nvim_win_get_buf(win) ~= self.buf
-      then
+      if not current() or not api.nvim_win_is_valid(win) or not api.nvim_buf_is_valid(self.buf) then
         return false
       end
+      api.nvim_win_set_buf(win, self.buf)
       pcall(vim.treesitter.stop, self.buf)
       vim.bo[self.buf].filetype, vim.bo[self.buf].syntax = "", ""
       api.nvim_buf_clear_namespace(self.buf, focus_ns, 0, -1)
@@ -255,6 +288,7 @@ function Preview:update(item, index)
       end)
       self.picker:_draw_frame()
       self:_release_retained(true)
+      self:_release_buffer()
       return true
     end
     if vim.in_fast_event() then

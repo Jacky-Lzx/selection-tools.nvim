@@ -138,6 +138,7 @@ function Picker:_draw_separators()
 end
 
 function Picker:_set_items(items)
+  self.confirmation = nil
   assert(type(items) == "table", "finder results must be a list")
   local entries = {}
   for index, item in ipairs(items) do
@@ -294,6 +295,9 @@ end
 function Picker:_render()
   if self.closed or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
     return
+  end
+  if self.confirmation and self.confirmation.is_cancelled() then
+    self.confirmation = nil
   end
   local count = #self.matches
   self.offset = math.max(0, math.min(self.offset, math.max(0, count - self.height)))
@@ -556,6 +560,7 @@ function Picker:set_query(query)
     return
   end
   self.query = query
+  self.confirmation = nil
   if not self.navigating_history then
     self.history_cursor, self.history_draft = #self.history + 1, query
   end
@@ -697,22 +702,67 @@ function Picker:restore(saved)
 end
 
 function Picker:confirm()
-  if self.closed then
+  if self.closed or self.matching or self.confirmation then
     return
   end
   local item, index = self:current()
-  if index then
-    self:close(item, index, self:selected({ fallback = true }))
+  if not index then
+    return
+  end
+  local query, selected = self.query, self:selected({ fallback = true })
+  local ctx = { picker = self, item = item, index = index, selected = selected }
+  self.confirmation = ctx
+  ctx.is_cancelled = function()
+    local current, current_index = self:current()
+    return self.closed
+      or self.confirmation ~= ctx
+      or self.matching
+      or current ~= item
+      or current_index ~= index
+      or self.query ~= query
+  end
+  ctx.reject = function(message)
+    if self.confirmation == ctx then
+      self.confirmation = nil
+      if message then
+        notify(tostring(message))
+      end
+    end
+  end
+  ctx.accept = function()
+    if ctx.is_cancelled() then
+      ctx.reject()
+      return false
+    end
+    self.confirmation = nil
+    self:close(item, index, selected, { reason = "confirm" })
+    return true
+  end
+  if not self.opts.before_confirm then
+    ctx.accept()
+    return
+  end
+  local ok, result, message = pcall(self.opts.before_confirm, ctx)
+  if not ok then
+    ctx.reject(result)
+  elseif result == true then
+    ctx.accept()
+  elseif result == false then
+    ctx.reject(message)
+  elseif result ~= nil then
+    ctx.reject("before_confirm must return true, false or nil")
   end
 end
 
 ---Close and call on_choice exactly once. No arguments means cancellation.
-function Picker:close(item, index, selected)
+function Picker:close(item, index, selected, outcome)
   if self.closed then
     return
   end
   require("selection_tools.state").remember(self)
   self.closed = true
+  self.confirmation = nil
+  outcome = outcome or { reason = index and "confirm" or "cancel" }
   self.matching = false
   self.matcher:cancel()
   if self.syntax then
@@ -761,7 +811,7 @@ function Picker:close(item, index, selected)
     active = nil
   end
   if self.opts.on_close then
-    local ok, err = pcall(self.opts.on_close, self)
+    local ok, err = pcall(self.opts.on_close, self, outcome)
     if not ok then
       notify(err)
     end
@@ -1039,6 +1089,10 @@ function Picker:_mount(resolved)
 end
 
 function Picker.new(opts)
+  assert(
+    opts.before_confirm == nil or type(opts.before_confirm) == "function",
+    "selection-tools: before_confirm must be a function"
+  )
   assert(
     opts.highlight_item == nil or type(opts.highlight_item) == "function",
     "selection-tools: highlight_item must be a function"
