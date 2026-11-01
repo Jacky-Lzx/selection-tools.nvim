@@ -267,6 +267,7 @@ function Syntax:_row(doc, item)
   local spans = doc.rows[row]
   return spans
 end
+-- nil means preparation is pending; an empty list is a ready plain-text fallback.
 function Syntax:highlights(item)
   local path = item.file
   self.clock = self.clock + 1
@@ -282,7 +283,7 @@ function Syntax:highlights(item)
   end
   if doc and doc.version == version then
     doc.used = self.clock
-    return self:_row(doc, item)
+    return self:_row(doc, item) or {}
   end
   local job = self.pending[path]
   if not job or job.version ~= version then
@@ -290,6 +291,9 @@ function Syntax:highlights(item)
   else
     job.used = self.clock
   end
+  -- Revalidate snapshots in the background without stripping existing colors.
+  -- _row only reuses spans when the candidate still has the exact same code.
+  return doc and self:_row(doc, item)
 end
 function Syntax:close()
   self.closed = true

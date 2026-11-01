@@ -32,7 +32,7 @@ end
 local function ready(p, path)
   assert(
     vim.wait(5000, function()
-      return not p.loading and p.syntax and p.syntax.files[path] and not p.syntax.pending[path]
+      return not p.loading and not p.syntax_pending and p.syntax and p.syntax.files[path] and not p.syntax.pending[path]
     end, 1),
     "syntax timed out"
   )
@@ -107,6 +107,86 @@ test("syntax reuses unchanged file snapshots and invalidates edited files on the
   assert(ok, err)
 end)
 
+test("search replacements never paint code before its syntax is ready", function()
+  local dir, first = source("atomic", { 'local first = "needle"' })
+  local second, stale = dir .. "/second.lua", dir .. "/stale.lua"
+  vim.fn.writefile({ 'local second = "needle"' }, second)
+  vim.fn.writefile({ 'local stale = "needle"' }, stale)
+  local util = require("selection_tools.sources.util")
+  local function item(path, name)
+    return util.location(path, 1, 0, "local " .. name .. ' = "needle"')
+  end
+  local read = vim.uv.fs_read
+  vim.uv.fs_read = function(fd, size, offset, callback)
+    return read(fd, size, offset, function(err, data)
+      vim.schedule(function()
+        vim.defer_fn(function()
+          callback(err, data)
+        end, 40)
+      end)
+    end)
+  end
+  local ok, err = xpcall(function()
+    local contexts, plain_frames = {}, 0
+    local p = tools.open({
+      live = true,
+      match = false,
+      syntax = { enabled = true },
+      format_item = util.format,
+      finder = function(ctx)
+        contexts[#contexts + 1] = ctx
+      end,
+    })
+    local render = p._render
+    p._render = function(self)
+      render(self)
+      local lines = vim.api.nvim_buf_get_lines(self.list_buf, 0, -1, false)
+      if table.concat(lines, "\n"):find("local", 1, true) and #captures(self) == 0 then
+        plain_frames = plain_frames + 1
+      end
+    end
+    local function publish(index, path, name)
+      contexts[index].set_items({ item(path, name) })
+      contexts[index].done()
+    end
+    local function view()
+      return {
+        vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false),
+        vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true }),
+      }
+    end
+    publish(1, first, "first")
+    ready(p, first)
+    eq(plain_frames, 0)
+    local displayed = view()
+    p:set_query("warm")
+    publish(2, first, "first")
+    ready(p, first)
+    eq(view(), displayed)
+    eq(plain_frames, 0)
+    p:set_query("cold")
+    publish(3, stale, "stale")
+    assert(vim.wait(1000, function()
+      return p.syntax.pending[stale] ~= nil
+    end, 1))
+    eq(view(), displayed)
+    p:confirm()
+    assert(not p.closed, "unpainted result was confirmed")
+    p:set_query("latest")
+    assert(vim.wait(1000, function()
+      return p.syntax.files[stale] and not p.syntax.pending[stale]
+    end, 1))
+    eq(view(), displayed)
+    publish(4, second, "second")
+    ready(p, second)
+    eq(plain_frames, 0)
+    assert(view()[1][1]:find("second", 1, true))
+    p:close()
+  end, debug.traceback)
+  vim.uv.fs_read = read
+  assert(ok, err)
+end)
+
 test("dirty-buffer context is preferred and refreshed without changing source state", function()
   local dir, path = source("dirty", { "local message = [[", 'print("needle")', "]]" })
   local buf = vim.fn.bufadd(path)
@@ -157,6 +237,9 @@ test("bounded document caches evict offscreen parsers and recolor revisited resu
   local function visible()
     assert(
       vim.wait(5000, function()
+        if p.syntax_pending then
+          return false
+        end
         for _, index in pairs(p.row_to_index) do
           local path = p.matches[index].item.file
           if not p.syntax or p.syntax.pending[path] or not p.syntax.files[path] or not p.syntax.files[path].parser then

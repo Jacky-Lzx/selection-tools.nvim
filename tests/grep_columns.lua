@@ -30,7 +30,7 @@ vim.fn.mkdir(fixture, "p")
 local function ready(p)
   assert(
     vim.wait(5000, function()
-      return not p.loading and not p.matching
+      return not p.loading and not p.matching and not p.syntax_pending
     end, 1),
     "source timed out"
   )

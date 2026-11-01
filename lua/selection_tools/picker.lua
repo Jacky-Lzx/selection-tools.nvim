@@ -10,6 +10,7 @@ local active
 ---@field closed boolean
 ---@field query string
 ---@field loading boolean
+---@field syntax_pending boolean|nil
 ---@field entries table[]
 ---@field matches table[]
 local Picker = {}
@@ -278,7 +279,7 @@ function Picker:_syntax(entry)
   end
   local spans = self.syntax:highlights(item)
   if not spans then
-    return {}
+    return
   end
   if entry.syntax_source ~= spans then
     local ranges = {}
@@ -295,6 +296,10 @@ function Picker:_render()
   if self.closed or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
     return
   end
+  -- A completed syntax job must not publish a superseded, never-displayed list.
+  if self.syntax_pending and (self.finder_pending or self.matching) then
+    return
+  end
   if self.confirmation and self.confirmation.is_cancelled() then
     self.confirmation = nil
   end
@@ -306,7 +311,7 @@ function Picker:_render()
     self.offset = self.index - self.height
   end
   local lines = {}
-  self.row_to_index = {}
+  local row_to_index, syntax, pending = {}, {}, false
   local reverse = self.opts.layout.reverse
   local show_marks = self.opts.multi and next(self.marks) ~= nil
   local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
@@ -321,7 +326,9 @@ function Picker:_render()
   for i = self.offset + 1, math.min(count, self.offset + self.height) do
     local row = reverse and (self.height - (i - self.offset) + 1) or (i - self.offset)
     local entry = self.matches[i]
-    self.row_to_index[row] = i
+    row_to_index[row] = i
+    syntax[row] = self:_syntax(entry)
+    pending = pending or syntax[row] == nil
     local icon = self:_icon(entry)
     if icon then
       icons[row] = icon
@@ -331,6 +338,12 @@ function Picker:_render()
       wanted_file = math.max(wanted_file, columns.info(entry).width)
     end
   end
+  self.syntax_pending = pending
+  if pending then
+    -- Publish text, syntax, query highlights and preview as one ready frame.
+    return
+  end
+  self.row_to_index = row_to_index
   wanted_file = wanted_file + (icon_width > 0 and icon_width + 1 or 0)
   local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
@@ -412,7 +425,7 @@ function Picker:_render()
         self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
           or {}
       end
-      for _, span in ipairs(self:_syntax(self.matches[index])) do
+      for _, span in ipairs(syntax[row]) do
         highlight(span[1], span[2], span.hl, span.priority)
       end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
@@ -651,7 +664,7 @@ function Picker:scroll_preview(direction)
 end
 
 function Picker:toggle()
-  if self.closed or not self.opts.multi then
+  if self.closed or self.syntax_pending or not self.opts.multi then
     return
   end
   local entry = self.matches[self.index]
@@ -747,7 +760,7 @@ function Picker:restore(saved)
 end
 
 function Picker:confirm()
-  if self.closed or self.matching or self.finder_pending or self.confirmation then
+  if self.closed or self.matching or self.finder_pending or self.syntax_pending or self.confirmation then
     return
   end
   local item, index = self:current()
@@ -763,6 +776,7 @@ function Picker:confirm()
       or self.confirmation ~= ctx
       or self.matching
       or self.finder_pending
+      or self.syntax_pending
       or current ~= item
       or current_index ~= index
       or self.query ~= query
@@ -974,7 +988,7 @@ function Picker:_events()
     buffer = self.list_buf,
     callback = function()
       local index = self.row_to_index[api.nvim_win_get_cursor(self.list_win)[1]]
-      if not self.rendering and index and index ~= self.index then
+      if not self.rendering and not self.syntax_pending and index and index ~= self.index then
         self.index = index
         self:_render()
       end
@@ -1158,6 +1172,7 @@ function Picker.new(opts)
     entries = {},
     matches = {},
     positions = {},
+    row_to_index = {},
     index = 1,
     offset = 0,
     generation = 0,

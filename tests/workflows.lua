@@ -29,7 +29,7 @@ end
 local function ready(p)
   assert(
     vim.wait(5000, function()
-      return not p.loading and not p.matching
+      return not p.loading and not p.matching and not p.syntax_pending
     end, 2),
     "source timed out"
   )

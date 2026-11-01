@@ -18,7 +18,7 @@ function M.close(picker, focus)
 end
 
 function M.open(picker)
-  if picker.closed then
+  if picker.closed or picker.syntax_pending then
     return
   end
   if picker.detail_win then

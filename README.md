@@ -93,6 +93,8 @@ require("selection_tools").open({
 
 只处理进入可见区域的文件和代码行，异步读取并复用解析结果；优先使用已加载 buffer 的未保存内容，不创建或修改源文件 buffer。磁盘缓存在新查询时检查元数据，buffer 缓存按 changedtick 更新。缺少语言解析器/查询或超过限制时保留普通文本及搜索高亮，不会自动安装解析器。
 
+缓存检查期间继续使用代码内容一致的已有高亮；新文件或变更行则保留上一帧，等可见结果的语法准备好后一起更新文字和高亮，避免先显示普通文本再补颜色。准备期间暂停对尚未显示结果的确认、多选、复制、打开和导出操作。
+
 ```lua
 require("selection_tools").grep({
   syntax = { enabled = true, max_size = 1024 * 1024, max_lines = 10000, cache_size = 8 },
@@ -334,7 +336,7 @@ local picker = require("selection_tools").open({
 })
 ```
 
-`ctx.set_items()` 替换候选列表；`ctx.done()` 结束加载；`ctx.fail(message)` 显示错误。这些方法可直接从异步回调调用。关闭窗口或更新 live 查询时，会执行 finder 返回的取消函数，旧请求结果会被丢弃。live 源每次重启会清空旧候选，避免确认到旧查询结果。
+`ctx.set_items()` 替换候选列表；`ctx.done()` 结束加载；`ctx.fail(message)` 显示错误。这些方法可直接从异步回调调用。关闭窗口或更新 live 查询时，会执行 finder 返回的取消函数，旧请求结果会被丢弃。live 源重启时保留旧列表直到新结果可用，等待期间暂停确认，避免选到旧查询结果。
 
 搜索源可通过 `highlight_item(item, original_index)` 返回 `{{start_byte, end_byte}, ...}`，为格式化条目的指定范围使用 `SelectionToolsMatch` 高亮。范围基于 `format_item` 返回的原始字符串，使用从 0 开始、右侧不包含的字节偏移；图标、多选标记和 Tab 等控制字符的显示转换由渲染器处理。回调仅对可见候选调用，结果缓存到候选被替换。grep 使用 ripgrep 返回的真实命中范围，不重新解释正则或进行模糊匹配。
 

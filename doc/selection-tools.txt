@@ -208,6 +208,10 @@ Only visible rows extract captures, and the bounded document cache keeps at
 least cache_size or the number of visible rows. New queries validate disk
 metadata; changed buffer ticks refresh buffer snapshots. Missing parsers/queries
 and files over the limits keep plain code plus query matches.
+Cached colors remain visible during validation when the code still matches.
+For uncached or changed rows, the previous frame remains until visible syntax
+is ready; text and highlights are published together. Confirmation, marking,
+copying, opening and exporting unpainted results are paused during preparation.
 
 Every visible nonempty ripgrep submatch is highlighted in the result label,
 including multiple hits per line and regex matches. Filenames are excluded.
