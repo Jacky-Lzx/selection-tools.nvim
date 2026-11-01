@@ -985,6 +985,9 @@ function Picker:_events()
           and win ~= self.preview_win
           and win ~= self.detail_win
         then
+          -- Focus has already left the picker, so close() will preserve the
+          -- destination window. End the picker's Insert mode there as well.
+          vim.cmd.stopinsert()
           self:close()
         end
       end)

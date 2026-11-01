@@ -75,6 +75,10 @@ def run_case(case):
                     else:
                         os.write(master, actions[stage])
                     handled.add(stage)
+                elif case == "mouse_tui" and stage.startswith("click_") and stage not in handled:
+                    col, row = map(int, Path(directory, "mouse").read_text().split())
+                    os.write(master, (f"\x1b[<0;{col};{row}M\x1b[<0;{col};{row}m").encode())
+                    handled.add(stage)
             if process.poll() is None:
                 process.kill()
                 raise AssertionError("Terminal test timed out; stages: " + repr(handled))
@@ -94,6 +98,7 @@ def run_case(case):
 
 if __name__ == "__main__":
     run_case("tui")
+    run_case("mouse_tui")
     run_case("preview_tui")
     run_case("lazy_tui")
     run_case("item_icons_tui")
