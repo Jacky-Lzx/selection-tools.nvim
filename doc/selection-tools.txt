@@ -80,6 +80,9 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsBorder       FloatBorder
   SelectionToolsSelected     Visual
   SelectionToolsMatch        Search
+  SelectionToolsMarked       Special
+  SelectionToolsUnmarked     Comment
+  SelectionToolsMarkSeparator Comment
   SelectionToolsCount        Comment colors, with italic disabled
   SelectionToolsFileIcon     Comment
   SelectionToolsFileLocation Comment foreground without italics
@@ -271,8 +274,13 @@ filetypes provide a fallback. Without the provider, a default file glyph is
 used. A Nerd Font is needed for Nerd Font glyphs.
 
 Only visible entries resolve icons, cached until their candidates are replaced.
-The mark uses one cell; the icon column fits visible glyphs with a one-cell
-gap. Icon colors use their own highlight spans, independently of match
+After marking the first item, a left column shows "○ │ " for unmarked items
+and "● │ " for marked items. It remains visible when marked items are filtered
+out and disappears when all marks are cleared.
+Unmarked circles and separators use the theme's Comment color; marked circles
+use Special. Override the corresponding highlight groups to customize them.
+The icon column fits visible glyphs with a one-cell gap on either side.
+Icon colors use their own highlight spans, independently of match
 highlights and multi-select markers. Icons do not
 change searchable text, matcher payloads, copied values or selection indices.
 format_icon receives the original object and index, even after filtering.

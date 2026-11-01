@@ -309,7 +309,8 @@ function Picker:_render()
   local lines = {}
   self.row_to_index = {}
   local reverse = self.opts.layout.reverse
-  local mark_width = self.opts.multi and 1 or 0
+  local show_marks = self.opts.multi and next(self.marks) ~= nil
+  local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
   local icons, icon_width, rows = {}, 0, {}
   local columns = self.opts.result_layout == "grep" and require("selection_tools.grep_row") or nil
   local wanted_file = 0
@@ -335,11 +336,15 @@ function Picker:_render()
   local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
-    local prefix = self.opts.multi and (self.marks[entry.index] and "*" or " ") or ""
+    local prefix = show_marks and ((self.marks[entry.index] and "●" or "○") .. " │ ") or ""
     if columns then
       rows[row] =
         columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], self:_highlights(entry), icon_width)
     else
+      if icon_width > 0 and not show_marks then
+        prefix = " "
+      end
+      local icon_start = #prefix
       if icon_width > 0 then
         local glyph = icons[row] and icons[row].text or ""
         prefix = prefix .. glyph .. string.rep(" ", icon_width - vim.fn.strdisplaywidth(glyph) + 1)
@@ -347,7 +352,7 @@ function Picker:_render()
       rows[row] = {
         text = prefix .. entry.text,
         segments = { { 0, #entry.text, #prefix } },
-        icon = icons[row] and { first = mark_width, last = mark_width + #icons[row].text, hl = icons[row].hl },
+        icon = icons[row] and { first = icon_start, last = icon_start + #icons[row].text, hl = icons[row].hl },
       }
     end
     lines[row] = rows[row].text
@@ -364,6 +369,18 @@ function Picker:_render()
   if count > 0 then
     for row, index in pairs(self.row_to_index) do
       local display = rows[row]
+      if show_marks then
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, 0, {
+          end_col = #"○",
+          hl_group = self.marks[self.matches[index].index] and "SelectionToolsMarked" or "SelectionToolsUnmarked",
+          priority = 120,
+        })
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, #"○ ", {
+          end_col = #"○ │",
+          hl_group = "SelectionToolsMarkSeparator",
+          priority = 120,
+        })
+      end
       local function highlight(first, last, group, priority)
         for _, segment in ipairs(display.segments) do
           local start, finish = math.max(first, segment[1]), math.min(last, segment[2])
@@ -1058,6 +1075,9 @@ function Picker:_mount(resolved)
   api.nvim_set_hl(0, "SelectionToolsBorder", { default = true, link = "FloatBorder" })
   api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
   api.nvim_set_hl(0, "SelectionToolsMatch", { default = true, link = "Search" })
+  api.nvim_set_hl(0, "SelectionToolsMarked", { default = true, link = "Special" })
+  api.nvim_set_hl(0, "SelectionToolsUnmarked", { default = true, link = "Comment" })
+  api.nvim_set_hl(0, "SelectionToolsMarkSeparator", { default = true, link = "Comment" })
   local count_hl = api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false, create = false })
   if vim.tbl_isempty(count_hl) then
     count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })

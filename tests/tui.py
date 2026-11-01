@@ -47,7 +47,7 @@ def run_case(case):
         if case == "match_tui":
             actions.update(type=b"png")
         if case == "item_icons_tui":
-            actions.update(select=b"\t", copy=b"\x19")
+            actions.update(select=b"\t", unselect=b"\x0e\t", reselect=b"\x0e\t", copy=b"\x19")
         if case == "lazy_tui":
             actions.update(type_again=b"bta", close_warm=b"\x1b")
         if case == "preview_tui":

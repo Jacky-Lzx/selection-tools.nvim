@@ -97,7 +97,7 @@ test("only visible file icons are resolved and revisiting rows reuses results", 
     local p = open(items)
     eq(loads(), 1)
     eq(calls, p.height)
-    eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, 1, false), { "λ file1.lua" })
+    eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, 1, false), { " λ file1.lua" })
     p:_render()
     eq(calls, p.height)
     p.index = p.height + 1
@@ -134,7 +134,15 @@ test("icon widths align labels and Unicode match highlights use byte offsets aft
   eq(match[4].end_col, start + #"β")
   local icon = marks(p, "Special")[1]
   eq(icon[3], 1)
-  eq(icon[4].end_col, 1 + #"λ")
+  eq(icon[4].end_col, #" λ")
+  p:toggle()
+  line = vim.api.nvim_buf_get_lines(p.list_buf, 0, 1, false)[1]
+  eq(line, "● │ λ βeta")
+  icon = marks(p, "Special")[1]
+  eq(icon[3], #"● │ ")
+  eq(icon[4].end_col, #"● │ λ")
+  match = marks(p, "SelectionToolsMatch")[1]
+  eq(line:sub(match[3] + 1, match[4].end_col), "β")
   p:set_query("λ")
   eq(#p.matches, 0)
   p:close()

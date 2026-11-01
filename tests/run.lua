@@ -492,6 +492,7 @@ test("multiselection survives filtering and preserves object identity", function
   local p = tools.open({
     items = { a, b },
     multi = true,
+    layout = { reverse = false },
     format_item = function(item)
       return item.text
     end,
@@ -499,11 +500,22 @@ test("multiselection survives filtering and preserves object identity", function
       chosen = { item, index, selected }
     end,
   })
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "alpha", "beta" })
+  p:toggle()
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "● │ alpha", "○ │ beta" })
+  p:set_query("beta")
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "○ │ beta" })
+  p:toggle()
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "● │ beta" })
+  local selected = p:selected()
+  assert(selected[1] == a and selected[2] == b)
+  p:toggle()
+  p:set_query("alpha")
+  p:toggle()
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "alpha" })
   p:toggle()
   p:set_query("beta")
   p:toggle()
-  local selected = p:selected()
-  assert(selected[1] == a and selected[2] == b)
   p:confirm()
   assert(chosen[1] == b and chosen[2] == 2 and chosen[3][1] == a and chosen[3][2] == b)
 end)

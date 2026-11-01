@@ -280,6 +280,10 @@ end)
 
 筛选后仍返回原始 Lua 对象和原列表索引；取消时回调收到 `nil, nil`。每个窗口只调用一次回调，调用前会清理窗口并恢复原窗口焦点。打开新 picker 会取消已有 picker。`open()` 可通过 `multi = true` 启用多选；确认回调的第三个参数是标记条目列表（没有标记时包含当前项），前两个参数仍是当前条目和索引。
 
+标记第一项后，列表左侧显示选择状态列：`○ │ item` 表示未选择，`● │ item` 表示已选择。标记被筛选隐藏时仍保留状态列；取消全部标记后收起。
+
+未选圆圈和竖线使用主题的 `Comment` 灰色，已选圆圈使用 `Special` 强调色，可分别通过 `SelectionToolsUnmarked`、`SelectionToolsMarkSeparator`、`SelectionToolsMarked` 高亮组覆盖。未显示状态列时，图标左侧同样保留一格 padding。
+
 ### 注册搜索源
 
 ```lua

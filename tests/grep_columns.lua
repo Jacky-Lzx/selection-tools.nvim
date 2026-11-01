@@ -72,11 +72,24 @@ test("code is left aligned with muted filenames and aligned trailing icons", fun
     eq(cell, p.resolved.width - 2)
     local name = label:sub(mark[3] + 1, mark[4].end_col)
     assert(name:match("%.lua:1:%d+$"))
-    assert(label:match("^ local") or label:match("^ return"))
+    assert(label:match("^local") or label:match("^return"))
   end
   local hl = vim.api.nvim_get_hl(0, { name = "SelectionToolsFileLocation", link = false })
   eq(hl.fg, vim.api.nvim_get_hl(0, { name = "Comment", link = false }).fg)
   assert(not hl.italic)
+  p:toggle()
+  for row, index in pairs(p.row_to_index) do
+    local label = vim.api.nvim_buf_get_lines(p.list_buf, row - 1, row, false)[1]
+    local prefix = p.marks[p.matches[index].index] and "● │ " or "○ │ "
+    eq(label:sub(1, #prefix), prefix)
+    eq(vim.fn.strwidth(label), p.resolved.width)
+    local icon = p.matches[index].grep_render.icon
+    eq(vim.fn.strwidth(label:sub(1, icon.first)), icon_column)
+  end
+  for _, hit in ipairs(grouped(p, "SelectionToolsMatch")) do
+    local label = vim.api.nvim_buf_get_lines(p.list_buf, hit[2], hit[2] + 1, false)[1]
+    eq(label:sub(hit[3] + 1, hit[4].end_col), "needle")
+  end
   p:close()
 end)
 
@@ -91,13 +104,14 @@ test("Unicode truncation respects cell budgets and composed character boundaries
       local item = util.location(string.rep("目录/", 8) .. "组合é很长的文件名.lua", 123, 400, code)
       local entry = { item = item, text = item.text }
       local first = assert(item.text:find("needle", 1, true)) - 1
-      for cells = 4, 120 do
-        local meta = rows.file_width(cells - 1, rows.info(entry).width + 3)
+      local mark = "● │ "
+      for cells = vim.fn.strwidth(mark), 120 do
+        local meta = rows.file_width(cells - vim.fn.strwidth(mark), rows.info(entry).width + 3)
         local display = rows.render(
           entry,
           cells,
           meta,
-          " ",
+          mark,
           { text = "🦀", hl = "Special" },
           { { first, first + 6 } }
         )
