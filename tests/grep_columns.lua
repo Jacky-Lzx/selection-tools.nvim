@@ -71,7 +71,7 @@ test("code is left aligned with muted filenames and aligned trailing icons", fun
     eq(cell, icon_column)
     eq(cell, p.resolved.width - 2)
     local name = label:sub(mark[3] + 1, mark[4].end_col)
-    assert(name:match("%.lua:1:%d+$"))
+    assert(name:match("%.lua%s+1:%d+$"))
     assert(label:match("^local") or label:match("^return"))
   end
   local hl = vim.api.nvim_get_hl(0, { name = "SelectionToolsFileLocation", link = false })
@@ -89,6 +89,66 @@ test("code is left aligned with muted filenames and aligned trailing icons", fun
   for _, hit in ipairs(grouped(p, "SelectionToolsMatch")) do
     local label = vim.api.nvim_buf_get_lines(p.list_buf, hit[2], hit[2] + 1, false)[1]
     eq(label:sub(hit[3] + 1, hit[4].end_col), "needle")
+  end
+  p:close()
+end)
+
+test("filenames and positions align independently when row and column digit counts differ", function()
+  local util = require("selection_tools.sources.util")
+  local items = {}
+  for _, value in ipairs({
+    { "same.lua", 11, 6 },
+    { "same.lua", 4, 25 },
+    { "same.lua", 1, 7 },
+    { "更长的中文é文件名.lua", 12345, 999 },
+    { "short.lua", 2, 9999 },
+  }) do
+    items[#items + 1] = util.location(value[1], value[2], value[3], "needle code", fixture)
+  end
+  local p = tools.open({
+    items = items,
+    result_layout = "grep",
+    multi = true,
+    format_item = util.format,
+    syntax = { enabled = false },
+    layout = { width = 0.95 },
+  })
+  local function aligned()
+    local filename_end, position_start, position_end, shown
+    for row, index in pairs(p.row_to_index) do
+      local entry = p.matches[index]
+      local display = entry.grep_render
+      local text = vim.api.nvim_buf_get_lines(p.list_buf, row - 1, row, false)[1]
+      assert(vim.fn.strwidth(text) <= p.resolved.width)
+      if display.file then
+        eq(vim.fn.strwidth(text), p.resolved.width)
+        local ending = vim.fn.strwidth(text:sub(1, display.filename[2]))
+        filename_end = filename_end or ending
+        eq(ending, filename_end)
+        if display.position then
+          local start = vim.fn.strwidth(text:sub(1, display.position[1]))
+          local finish = vim.fn.strwidth(text:sub(1, display.position[2]))
+          position_start, position_end = position_start or start, position_end or finish
+          eq(start, position_start)
+          eq(finish, position_end)
+          local value = text:sub(display.position[1] + 1, display.position[2]):gsub("^%s+", "")
+          eq(value, ("%d:%d"):format(entry.item.pos[1], entry.item.pos[2] + 1))
+          eq(start - ending, 2)
+          shown = true
+        else
+          assert(not shown, "position column is hidden consistently")
+        end
+      end
+    end
+    return shown
+  end
+  assert(aligned(), "wide layout shows an independent position column")
+  p:toggle()
+  assert(aligned(), "selection markers preserve both metadata columns")
+  for _, cells in ipairs({ 48, 25, 12, 75 }) do
+    p.opts.layout.width = cells
+    p:resize()
+    aligned()
   end
   p:close()
 end)

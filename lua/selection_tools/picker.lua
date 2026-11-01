@@ -317,7 +317,7 @@ function Picker:_render()
   local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
   local icons, icon_width, rows = {}, 0, {}
   local columns = self.opts.result_layout == "grep" and require("selection_tools.grep_row") or nil
-  local wanted_file = 0
+  local wanted_file, wanted_position = 0, 0
   if reverse and count > 0 then
     for row = 1, self.height do
       lines[row] = ""
@@ -335,7 +335,9 @@ function Picker:_render()
       icon_width = math.max(icon_width, vim.fn.strdisplaywidth(icon.text))
     end
     if columns then
-      wanted_file = math.max(wanted_file, columns.info(entry).width)
+      local info = columns.info(entry)
+      wanted_file = math.max(wanted_file, info.file_width)
+      wanted_position = math.max(wanted_position, info.position_width)
     end
   end
   self.syntax_pending = pending
@@ -344,7 +346,7 @@ function Picker:_render()
     return
   end
   self.row_to_index = row_to_index
-  wanted_file = wanted_file + (icon_width > 0 and icon_width + 1 or 0)
+  wanted_file = wanted_file + 2 + wanted_position + (icon_width > 0 and icon_width + 1 or 0)
   local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
@@ -361,7 +363,8 @@ function Picker:_render()
           focus[#focus + 1] = { vim.fn.byteidx(entry.text, pos), vim.fn.byteidx(entry.text, pos + 1) }
         end
       end
-      rows[row] = columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width)
+      rows[row] =
+        columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width, wanted_position)
     else
       if icon_width > 0 and not show_marks then
         prefix = " "

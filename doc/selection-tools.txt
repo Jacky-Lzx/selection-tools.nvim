@@ -154,9 +154,11 @@ The first search leaves the list blank until results arrive. "No results" is
 shown only when the search completes without results, with no loading label.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
-Grep defaults to result_layout="grep": code is left-aligned and file locations
-are right-aligned, followed by a fixed-width icon column. Icons align across
-rows, including mixed-width glyphs. SelectionToolsFileLocation
+Grep defaults to result_layout="grep": code is left-aligned; filenames and
+line:column positions each have their own right-aligned column, separated by two
+spaces and followed by a fixed-width icon column. Position width is shared across
+visible rows, so changing digit counts never shifts filename alignment. Icons
+align across rows, including mixed-width glyphs. SelectionToolsFileLocation
 uses the Comment foreground without italics. Code indentation is trimmed for
 display; long code is clipped around the first hit. Long paths use a leading
 ellipsis to retain the filename. Widths use terminal cells and preserve composed

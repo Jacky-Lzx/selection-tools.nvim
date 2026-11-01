@@ -3,10 +3,13 @@ vim.o.swapfile, vim.o.termguicolors = false, true
 local tools = require("selection_tools")
 local directory = assert(vim.env.SELECTION_TOOLS_TEST_DIR)
 local file = "很长的文件名é_中文_document.lua"
-vim.fn.writefile(
-  { "\t" .. string.rep("中文é context ", 20) .. "needle " .. string.rep("tail ", 12) },
-  directory .. "/" .. file
-)
+local source = {}
+for row = 1, 123 do
+  source[row] = "-- context " .. row
+end
+source[1] = "\t" .. string.rep("中文é context ", 20) .. "needle " .. string.rep("tail ", 12)
+source[2], source[12], source[123] = "needle", string.rep(" ", 25) .. "needle", "local needle = true"
+vim.fn.writefile(source, directory .. "/" .. file)
 vim.api.nvim_set_hl(0, "Comment", { fg = "#888888" })
 local p = tools.grep({
   cwd = directory,
@@ -17,35 +20,51 @@ local p = tools.grep({
 })
 local function check()
   vim.cmd.redraw()
-  local row = p.opts.layout.reverse and p.height or 1
-  local line = vim.api.nvim_buf_get_lines(p.list_buf, row - 1, row, false)[1]
-  assert(vim.fn.strwidth(line) <= p.resolved.width, "Row crossed the right border")
-  local hit, location
+  local marks = {}
   for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })) do
+    local row = mark[2] + 1
+    marks[row] = marks[row] or {}
     if mark[4].hl_group == "SelectionToolsMatch" then
-      hit = mark
+      marks[row].hit = mark
     end
     if mark[4].hl_group == "SelectionToolsFileLocation" then
-      location = mark
+      marks[row].location = mark
     end
   end
-  assert(hit and line:sub(hit[3] + 1, hit[4].end_col) == "needle", "Ellipsis hid the query")
-  local top, left = unpack(vim.api.nvim_win_get_position(p.list_win))
-  local cell = left + vim.fn.strwidth(line:sub(1, hit[3])) + 1
-  assert(vim.fn.screenstring(top + row, cell) == "n", "Hit is not visible on screen")
-  if p.resolved.width - 1 >= 18 then
-    local icon = p.matches[p.index].grep_render.icon
-    assert(location and location[4].end_col == (icon and icon.first - 1 or #line))
-    assert(vim.fn.strwidth(line) == p.resolved.width)
-    if icon then
-      assert(icon.last == #line, "Icon is not flush right")
+  local filename_end, position_start, position_end
+  for row, index in pairs(p.row_to_index) do
+    local line = vim.api.nvim_buf_get_lines(p.list_buf, row - 1, row, false)[1]
+    assert(vim.fn.strwidth(line) <= p.resolved.width, "Row crossed the right border")
+    local hit, location = marks[row].hit, marks[row].location
+    assert(hit and line:sub(hit[3] + 1, hit[4].end_col) == "needle", "Ellipsis hid the query")
+    local top, left = unpack(vim.api.nvim_win_get_position(p.list_win))
+    local cell = left + vim.fn.strwidth(line:sub(1, hit[3])) + 1
+    assert(vim.fn.screenstring(top + row, cell) == "n", "Hit is not visible on screen")
+    local display = p.matches[index].grep_render
+    if p.resolved.width - 1 >= 18 then
+      local icon = display.icon
+      assert(location and location[4].end_col == (icon and icon.first - 1 or #line))
+      assert(vim.fn.strwidth(line) == p.resolved.width)
+      if icon then
+        assert(icon.last == #line, "Icon is not flush right")
+      end
+      assert(hit[4].end_col <= location[3], "Code overlaps the file column")
+      local ending = vim.fn.strwidth(line:sub(1, display.filename[2]))
+      filename_end = filename_end or ending
+      assert(filename_end == ending, "Filename right edges are not aligned")
+      if display.position then
+        local start = vim.fn.strwidth(line:sub(1, display.position[1]))
+        local finish = vim.fn.strwidth(line:sub(1, display.position[2]))
+        position_start, position_end = position_start or start, position_end or finish
+        assert(position_start == start and position_end == finish, "Position column is not aligned")
+        assert(start - ending == 2, "Filename and position columns need a fixed gap")
+      end
+      local hl = vim.api.nvim_get_hl(0, { name = "SelectionToolsFileLocation", link = false })
+      assert(hl.fg == 0x888888, "File column is not muted gray")
+      assert(vim.fn.screenstring(top + row, left + p.resolved.width) ~= " ", "File column is not flush right")
+    else
+      assert(not location, "Tiny window should prioritize code")
     end
-    assert(hit[4].end_col <= location[3], "Code overlaps the file column")
-    local hl = vim.api.nvim_get_hl(0, { name = "SelectionToolsFileLocation", link = false })
-    assert(hl.fg == 0x888888, "File column is not muted gray")
-    assert(vim.fn.screenstring(top + row, left + p.resolved.width) ~= " ", "File column is not flush right")
-  else
-    assert(not location, "Tiny window should prioritize code")
   end
   assert(vim.api.nvim_get_current_win() == p.input_win and vim.api.nvim_get_mode().mode == "i")
 end
@@ -93,7 +112,7 @@ timer:start(
       elseif stage == "closed" and p.closed then
         finish(
           true,
-          "PASS terminal grep columns: left code, gray right-aligned paths, Unicode ellipsis, visible query and live narrow/tiny/wide resizing"
+          "PASS terminal grep columns: left code, separately aligned filenames and positions, Unicode ellipsis, visible query and live narrow/tiny/wide resizing"
         )
       end
     end, debug.traceback)

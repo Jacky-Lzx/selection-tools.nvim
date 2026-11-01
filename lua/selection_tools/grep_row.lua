@@ -55,14 +55,16 @@ function M.info(entry)
     local item = entry.item
     local code = clean(item.display_code or item.code)
     local file = clean(item.display_file or vim.fn.fnamemodify(item.file, ":~:."))
-    local suffix = (":%d:%d"):format(item.pos[1], item.pos[2] + 1)
+    local position = ("%d:%d"):format(item.pos[1], item.pos[2] + 1)
     entry.grep_info = {
       code = code,
       ambiwidth = vim.o.ambiwidth,
       offset = #entry.text - #code,
       file = file,
-      suffix = suffix,
-      width = width(file .. suffix),
+      position = position,
+      file_width = width(file),
+      position_width = width(position),
+      width = width(file) + 2 + width(position),
     }
   end
   return entry.grep_info
@@ -99,7 +101,7 @@ local function snippet(code, cells, focus, focus_end, preserve_indent)
   local body = keep(rest, math.max(0, remaining - width(trailing)), false)
   return leading .. body .. trailing, start, start + #body, #leading
 end
-function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
+function M.render(entry, cells, file_cells, mark, icon, matches, icon_width, position_width)
   local info = M.info(entry)
   local focus, focus_end
   for _, range in ipairs(matches) do
@@ -110,6 +112,7 @@ function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
     end
   end
   icon_width = icon_width or (icon and width(icon.text) or 0)
+  position_width = math.max(position_width or 0, info.position_width)
   local key = cells
     .. ":"
     .. file_cells
@@ -125,6 +128,8 @@ function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
     .. (focus or "")
     .. ":"
     .. (focus_end or "")
+    .. ":"
+    .. position_width
   if entry.grep_render_key == key then
     return entry.grep_render
   end
@@ -140,16 +145,22 @@ function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
       icon_cells = 0
     end
     local path_cells = file_cells - icon_cells
-    local name
-    if path_cells >= width(info.suffix) + 4 then
-      name = tail(info.file, path_cells - width(info.suffix)) .. info.suffix
-    else
-      name = tail(info.file, path_cells)
+    local show_position = path_cells >= position_width + 2 + 4
+    if show_position then
+      path_cells = path_cells - position_width - 2
     end
-    local pad = code_cells - width(code) + gap + file_cells - width(name) - icon_cells
+    local name = tail(info.file, path_cells)
+    local pad = code_cells - width(code) + gap + path_cells - width(name)
     result.text = result.text .. string.rep(" ", math.max(0, pad))
-    result.file = { #result.text, #result.text + #name }
+    result.filename = { #result.text, #result.text + #name }
     result.text = result.text .. name
+    if show_position then
+      result.text = result.text .. "  "
+      local first = #result.text
+      result.text = result.text .. string.rep(" ", position_width - info.position_width) .. info.position
+      result.position = { first, #result.text }
+    end
+    result.file = { result.filename[1], #result.text }
     if icon_cells > 0 then
       result.text = result.text .. " "
       if glyph ~= "" then
