@@ -38,7 +38,7 @@ local function check()
   local original = assert(source:find(codeword, 1, true)) - 1
   local list_color = screen_attr(p.list_win, listrow, start)
   local body_color = screen_attr(p.preview_win, item.pos[1], original)
-  assert(list_color == body_color, "Result code does not use the正文 Tree-sitter colors")
+  assert(list_color == body_color, "Result code does not use the source Tree-sitter colors")
   local file
   for _, location in
     ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, { listrow - 1, 0 }, { listrow - 1, -1 }, { details = true }))
@@ -92,7 +92,7 @@ timer:start(
       if p.closed then
         finish(
           true,
-          "PASS terminal Tree-sitter code colors match正文; multiline string context; current preview line and exact matches; moving results preserves input focus"
+          "PASS terminal Tree-sitter code colors match source; multiline string context; current preview line and exact matches; moving results preserves input focus"
         )
         return
       end

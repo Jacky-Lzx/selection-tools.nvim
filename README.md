@@ -1,17 +1,17 @@
 # selection-tools.nvim
 
-一个独立的 Neovim 搜索选择插件：提供可复用的搜索窗口与公开 API，并内置文件搜索和 buffer 列表。无需依赖 Snacks。
+A standalone Neovim search and selection plugin with reusable picker windows, a public API, and built-in file and buffer sources. No Snacks dependency.
 
-## 要求
+## Requirements
 
 - Neovim 0.10+
-- 文件搜索需要 `fd` 或 `rg`（优先使用 `fd`）；普通列表选择无需外部程序
-- 文件类型图标可选使用 `nvim-web-devicons`；Nerd Font 用于显示文件和目录字形
-- 大列表可选使用 `sk`（skim），已验证 5.8.0；缺少或不兼容时自动回退原生匹配
+- File search requires `fd` or `rg` (`fd` is preferred); ordinary list selection needs no external programs
+- Optional `nvim-web-devicons` for filetype icons; a Nerd Font for file and directory glyphs
+- Optional `sk` (skim) for large lists, tested with 5.8.0; automatically falls back to native matching if unavailable or incompatible
 
-## 安装与配置
+## Installation and configuration
 
-当前本地开发目录可通过 lazy.nvim 加载：
+Load the local development checkout with lazy.nvim:
 
 ```lua
 {
@@ -20,7 +20,7 @@
   main = "selection_tools",
   cmd = "SelectionTools",
   opts = {
-    ui_select = false, -- 设为 true 后接管 vim.ui.select
+    ui_select = false, -- Set to true to handle vim.ui.select
     layout = { width = 0.6, height = 0.5, border = "rounded" },
   },
   keys = {
@@ -30,15 +30,15 @@
 }
 ```
 
-也可将本仓库添加到 `runtimepath`，直接调用 API；`setup()` 可省略。如果要接管 `vim.ui.select`，请确保插件在调用它之前加载，例如在上述配置中使用 `lazy = false`。
+You can also add this repository to `runtimepath` and call the API directly; `setup()` is optional. To handle `vim.ui.select`, load the plugin before any calls to it, for example by adding `lazy = false` to the configuration above.
 
 ```lua
 require("selection_tools").setup({ ui_select = true })
 ```
 
-默认不会接管现有的 `vim.ui.select`，也不会修改 Snacks 或全局快捷键。若同时启用了其他 `vim.ui.select` 实现，以最后设置的实现为准。
+By default, the plugin leaves the existing `vim.ui.select`, Snacks, and global keymaps unchanged. If multiple `vim.ui.select` implementations are enabled, the last one installed takes precedence.
 
-## 使用
+## Usage
 
 ```vim
 :SelectionTools files
@@ -46,33 +46,33 @@ require("selection_tools").setup({ ui_select = true })
 :SelectionTools
 ```
 
-不带参数时默认搜索文件，支持搜索源名称补全。
+With no arguments, the command searches files. Source names support completion.
 
-直接输入可进行模糊搜索，使用 smart case（全小写查询忽略大小写，含大写字符时区分大小写）；`<C-n>` / `<Down>` 和 `<C-p>` / `<Up>` 移动，`<CR>` 确认，`<Esc>` / `<C-c>` 取消。结果列表中还支持普通模式 `j` / `k`，按 `/` 返回搜索框。没有匹配结果时，回车不会关闭窗口或选中其他条目。
+Type to fuzzy search with smart case: lowercase queries ignore case, while queries containing uppercase characters are case sensitive. Move with `<C-n>` / `<Down>` and `<C-p>` / `<Up>`, confirm with `<CR>`, and cancel with `<Esc>` / `<C-c>`. The results list also supports Normal mode `j` / `k`; press `/` to return to the search input. When there are no matches, Enter leaves the window open without selecting another item.
 
 ```lua
 local selection = require("selection_tools")
 selection.files({ cwd = vim.fn.expand("~/project"), hidden = true, ignored = false })
-selection.buffers({ current = false }) -- 排除当前 buffer
+selection.buffers({ current = false }) -- Exclude the current buffer
 ```
 
-`cwd` 默认是调用时的当前目录。文件扫描异步执行，之后输入查询只筛选已有结果。默认遵守忽略规则，不包含隐藏文件；`.git` 目录始终排除。文件和 buffer 搜索默认启用预览、多选；支持实时全文搜索。
+`cwd` defaults to the working directory at the time of the call. File scanning runs asynchronously; subsequent queries filter the collected candidates. By default, scanning respects ignore rules and excludes hidden files; `.git` directories are always excluded. File and buffer pickers enable previews and multiple selection by default. Live full-text search is also available.
 
-异步搜索和匹配不显示 `Loading` / `Matching` 提示。连续输入时保留当前列表和预览，直到新结果可用后再替换；首次等待时列表留空，搜索完成且没有结果时才显示 `No results`。等待新搜索的首批结果时暂停确认、分屏和结果导出，避免操作旧查询的条目。
+Asynchronous searches and matching do not show `Loading` / `Matching` messages. While typing, the current list and preview stay visible until new results are ready. The list stays empty during the initial wait and shows `No results` only after a search finishes without matches. Confirmation, split opening, and result export are paused until the first results of a new search arrive, preventing actions on items from the previous query.
 
-## 条目图标
+## Item icons
 
-文件、buffer、grep、最近文件等带文件位置的条目默认显示独立的图标列，项目目录显示文件夹图标。首次显示文件条目时按需加载可选的 `nvim-web-devicons`，使用其文件类型图标及高亮组；未安装时显示默认文件图标。仅为可见条目解析图标，并缓存本次候选的结果。
+Items with file locations, including files, buffers, grep results, and recent files, show a separate icon column by default. Project directories show folder icons. The optional `nvim-web-devicons` is loaded on demand when file items first appear, supplying filetype icons and highlight groups; a default file icon is used when it is unavailable. Icons are resolved only for visible items and cached for the current candidates.
 
-图标和多选标记均独立于搜索文本，不参与 native/skim 匹配、排序或复制路径。多选标记仅占一格，图标列按可见字形宽度对齐，列间留一格间距，支持窄字符、宽字符和 Emoji。
+Icons and selection marks are separate from searchable text and do not affect native/skim matching, ranking, or copied paths. Selection marks occupy one display cell. The icon column aligns by visible glyph width with one cell between columns, supporting narrow and wide characters and Emoji.
 
 ```lua
--- 全局关闭，也可以给 files()/buffers()/open() 等单次调用传入相同选项。
+-- Disable globally, or pass the same option to individual files()/buffers()/open() calls.
 require("selection_tools").setup({ item_icons = { enabled = false } })
 
--- 自定义来源：返回字形和高亮组名称，nil 表示该项不显示图标。
+-- Custom source: return a glyph and highlight group, or nil to omit the icon.
 require("selection_tools").open({
-  item_icons = { enabled = true }, -- 本次调用开启图标
+  item_icons = { enabled = true }, -- Enable icons for this call
   items = { { text = "Lua task", icon = "λ", icon_hl = "Special" } },
   format_item = function(item) return item.text end,
   format_icon = function(item, original_index)
@@ -81,19 +81,19 @@ require("selection_tools").open({
 })
 ```
 
-`format_icon` 覆盖自动文件图标解析，同样只对可见条目调用。`item_icons = false` 也可关闭图标，包括自定义回调。这里的 `item_icons` 控制列表装饰，与 `icons()` 图标选择器的自定义目录选项 `icons` 分开。
+`format_icon` overrides automatic file icon resolution and is called only for visible items. `item_icons = false` disables icons, including custom callbacks. This `item_icons` option controls list decorations and is separate from the `icons` option for custom catalogs in the `icons()` picker.
 
-## Grep 代码配色与预览定位
+## Grep syntax colors and preview positions
 
-`<Space>sg` 默认按代码、文件名、行列位置、图标分列：代码在左侧左对齐，右侧文件名与 `行:列` 各自右对齐，两列间留两格空白；行列号位数变化不会再带动文件名偏移。文件位置使用 `SelectionToolsFileLocation`（默认取 `Comment` 的前景色，无斜体），文件图标位于最右侧的固定宽度列中，逐行对齐。
+`<Space>sg` uses separate columns for code, filenames, line/column positions, and icons by default. Code is left aligned; filenames and `line:column` positions are independently right aligned, with two spaces between them. Changes in the number of position digits do not shift filenames. File locations use `SelectionToolsFileLocation` (the `Comment` foreground without italics by default). File icons align in a fixed-width column at the far right.
 
-列宽按终端显示单元计算，支持中文、宽字符及组合字符。长路径从左侧省略以保留文件名，长代码围绕首个命中截取并显示省略号；显示时去掉代码的前导空白。窄窗口逐步隐藏图标、行列号，极窄时只显示代码。省略后的语法及匹配高亮同步调整，原始内容、复制路径及跳转位置保持完整。可用 `grep({ result_layout = "plain" })` 恢复文件位置在前的布局。
+Column widths use terminal display cells, supporting Chinese, wide, and combining characters. Long paths are truncated from the left to preserve filenames; long code is clipped around the first match with ellipses, and leading whitespace is removed for display. Narrow windows progressively hide icons and positions; very narrow windows show only code. Syntax and match highlights adjust to truncation, while original content, copied paths, and jump locations remain intact. Use `grep({ result_layout = "plain" })` to restore the layout with file locations first.
 
-`<Space>sg` 使用的 `grep()` 默认给条目中的代码应用 Tree-sitter 配色，沿用当前 runtime 的语言、注入及 `highlights` 查询。解析基于完整文件上下文，能区分跨行字符串中的文字和独立代码；文件名、行列号及图标保留各自样式，搜索命中继续叠加高亮。
+The `grep()` source used by `<Space>sg` applies Tree-sitter colors to result code by default, using the current runtime's languages, injections, and `highlights` queries. Parsing uses the full file context to distinguish text inside multiline strings from standalone code. Filenames, positions, and icons retain their own styles, with search highlights layered over the code.
 
-只处理进入可见区域的文件和代码行，异步读取并复用解析结果；优先使用已加载 buffer 的未保存内容，不创建或修改源文件 buffer。磁盘缓存在新查询时检查元数据，buffer 缓存按 changedtick 更新。缺少语言解析器/查询或超过限制时保留普通文本及搜索高亮，不会自动安装解析器。
+Only visible files and code lines are processed, with asynchronous reads and reused parse results. Unsaved content in loaded buffers takes precedence; source buffers are neither created nor modified. Disk caches check metadata for each new query, and buffer caches update by changedtick. Missing parsers/queries or exceeded limits fall back to plain text with search highlights; parsers are not installed automatically.
 
-缓存检查期间继续使用代码内容一致的已有高亮；新文件或变更行则保留上一帧，等可见结果的语法准备好后一起更新文字和高亮，避免先显示普通文本再补颜色。准备期间暂停对尚未显示结果的确认、多选、复制、打开和导出操作。
+Existing highlights remain visible during cache checks when the code content is unchanged. For new files or changed lines, the previous frame stays visible until syntax for the visible results is ready, then text and highlights update together to avoid briefly showing uncolored code. Confirmation, selection, copying, opening, and export are paused for results that have not yet been displayed.
 
 ```lua
 require("selection_tools").grep({
@@ -102,25 +102,25 @@ require("selection_tools").grep({
 })
 ```
 
-`syntax.enabled = false` 关闭条目代码配色。文档缓存至少容纳可见行数量，避免多文件列表反复解析。预览中的当前结果行使用 `SelectionToolsPreviewLine`（默认 `CursorLine`），匹配内容使用 `SelectionToolsPreviewMatch`（默认 `Search`）；两者可分别关闭。预览切换会同步更新这些标记；如果 buffer 正文已与磁盘搜索结果不同，则不套用过期的匹配范围。
+`syntax.enabled = false` disables result code colors. The document cache holds at least as many entries as there are visible rows to avoid repeatedly parsing lists spanning many files. The current result line in the preview uses `SelectionToolsPreviewLine` (`CursorLine` by default), and matched text uses `SelectionToolsPreviewMatch` (`Search` by default); each can be disabled separately. These marks update with the preview. Stale match ranges are not applied when buffer content differs from the disk search results.
 
-## 结果操作
+## Result actions
 
-`<C-q>` 将多选项（未多选时为全部过滤结果）发送到 Quickfix，`<C-l>` 发送到调用窗口的 Location list，并打开列表。只有文件位置条目会被导出；行列号与原始代码内容保留。可将 `keys.quickfix_all` / `keys.loclist_all` 配置为始终导出全部过滤结果。
+`<C-q>` sends marked items, or all filtered results if none are marked, to Quickfix. `<C-l>` sends them to the calling window's Location list. Both open the target list. Only items with file locations are exported, preserving positions and original code. Configure `keys.quickfix_all` / `keys.loclist_all` to always export all filtered results.
 
-`<C-x>` 水平分屏、`<C-v>` 垂直分屏、`<C-t>` 新 Tab 打开当前位置；多选时每项各开一个窗口或 Tab。文件、buffer、grep 和最近文件等位置条目均适用，保留未保存内容及行列位置。
+`<C-x>` opens the current location in a horizontal split, `<C-v>` in a vertical split, and `<C-t>` in a new tab. Each marked item gets its own window or tab. These actions support location items from files, buffers, grep, recent files, and similar sources, preserving unsaved content and line/column positions.
 
-`<F2>` 打开当前条目的只读详情窗口，展示完整路径、行列号和未经省略的代码或内容，自动折行，可用原生 Normal 模式滚动/选择。`q` / `<Esc>` 返回同一个搜索窗口并保留输入、选择与多选；详情中的 `<C-y>` 复制完整内容。`<F3>` 临时扩大已有预览，保留少量列表行，再按一次恢复原比例。
+`<F2>` opens read-only details for the current item, including the full path, position, and untruncated code or content. Text wraps, and native Normal mode scrolling and selection are available. `q` / `<Esc>` returns to the same picker with its query, current selection, and marks preserved; `<C-y>` in the details window copies the full content. `<F3>` temporarily enlarges an existing preview while retaining a few list rows; press it again to restore the original proportions.
 
-## 搜索范围与模式
+## Search scope and modes
 
-文件搜索和 grep 窗口内可用 `<A-h>` 切换隐藏文件、`<A-i>` 切换忽略文件、`<A-f>` 设置搜索目录、`<A-g>` 设置文件 glob（逗号分隔，`!` 排除，例如 `*.rs,!vendor/**`）。grep 另有 `<A-r>` 切换正则/字面模式、`<A-c>` 循环 smart/sensitive/ignore 大小写策略。状态显示在标题中；操作会保留输入、取消旧任务并重新搜索，`resume()` 保留这些选项。文件 glob 过滤需要 ripgrep。
+In file and grep pickers, `<A-h>` toggles hidden files, `<A-i>` toggles ignored files, `<A-f>` sets the search directory, and `<A-g>` sets file globs (comma separated, with `!` for exclusions, such as `*.rs,!vendor/**`). Grep also supports `<A-r>` to toggle regex/literal mode and `<A-c>` to cycle through smart/sensitive/ignore case policies. The title shows the current settings. Changes preserve the query, cancel old work, and restart the search; `resume()` retains these options. File glob filtering requires ripgrep.
 
-也可调用 `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })`，或在 `files()` / `grep()` 的调用选项中指定。
+You can also call `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })` or pass these options to `files()` / `grep()`.
 
-## image-tools 图片联动
+## image-tools integration
 
-可选联动使用 image-tools.nvim 的公共 `supports()` / `render()` API，图片转换、缓存和终端渲染由 image-tools 负责；本插件提供预览窗口和生命周期。不会调用 Snacks.image，也不内置 chafa 或其他图像后端。
+The optional integration uses image-tools.nvim's public `supports()` / `render()` API. image-tools handles image conversion, caching, and terminal rendering; this plugin owns the preview window and its lifecycle. It does not call Snacks.image or bundle chafa or other image backends.
 
 ```lua
 require("selection_tools").setup({
@@ -130,29 +130,29 @@ require("selection_tools").setup({
 })
 ```
 
-在 lazy.nvim 尚未加载插件的 `opts` 表中，可使用延迟回调：`providers = { function(ctx) return require("selection_tools.integrations.image_tools").preview(ctx) end }`。
+In a lazy.nvim `opts` table evaluated before the plugin loads, use a deferred callback: `providers = { function(ctx) return require("selection_tools.integrations.image_tools").preview(ctx) end }`.
 
-适配器仅在遇到 PNG、SVG、PDF 等候选时加载 image-tools，普通文本沿用原预览，已加载的未保存文本优先。图片保留比例适配预览区；切换图片时保留上一张已就绪的图像，等新图片放置确认并绘制后再释放旧视图，避免 Loading/空白闪烁；快速跳过的请求仍会取消。关闭会释放本次及保留视图，`F3` 及窗口缩放会更新已有视图并复用像素缓存。需要包含嵌入式 API 的 image-tools 版本和其支持的终端图像能力，错误会显示在预览区。联动默认不启用，也不改变 `vim.ui.select` 的预览优先级。
+The adapter loads image-tools only for candidates such as PNG, SVG, and PDF files. Ordinary text uses the standard preview, with loaded, unsaved text taking precedence. Images fit the preview area while preserving their aspect ratio. When switching images, the previous ready image stays visible until the new placement is acknowledged and drawn, then the old view is released to avoid Loading/blank flashes. Requests skipped by rapid navigation are still cancelled. Closing releases both current and retained views; `F3` and window resizing update existing views and reuse cached pixels. This requires an image-tools version with the embedded API and a terminal with supported image capabilities; errors appear in the preview. The integration is disabled by default and does not change preview priority for `vim.ui.select`.
 
-`provider({ page = 2, upscale = false })` 可指定 PDF 页码及放大策略。`extensions` 可提供额外的扩展名映射（如 `{ png=true, pdf=true }`）作为按需加载的前置筛选；最终格式能力仍由 image-tools 判断。
+Use `provider({ page = 2, upscale = false })` to set the PDF page and upscaling policy. `extensions` can supply additional extension mappings (such as `{ png=true, pdf=true }`) as an initial filter for loading the integration on demand; image-tools still determines actual format support.
 
-## 通用预览 provider
+## Preview providers
 
-### 确认前校验与事务窗口
+### Validation before confirmation and transactional pickers
 
-`open()` / `select()` 支持 `before_confirm(ctx)`。返回 `true` 确认并关闭，
-返回 `false, message` 拒绝并保留窗口；校验抛错也会显示错误并保留窗口。
-返回 `nil` 表示异步处理，之后在主线程调用 `ctx.accept()` 或 `ctx.reject(message)`。
-`ctx` 包含 `picker/item/index/selected/is_cancelled()`；确认一次后不再接受重复确认。
-切换条目、改变查询、替换候选或关闭窗口，会使未完成确认失效；迟到的
-`accept()` 返回 `false`。异步回调需要先检查 `is_cancelled()`，并用 `vim.schedule`
-从 fast callback 返回主线程。
+`open()` / `select()` support `before_confirm(ctx)`. Return `true` to confirm and close,
+or `false, message` to reject and keep the window open. Validation errors are also displayed without closing the window.
+Return `nil` for asynchronous handling, then call `ctx.accept()` or `ctx.reject(message)` on the main thread.
+`ctx` includes `picker/item/index/selected/is_cancelled()`; repeated confirmation is blocked while a confirmation is pending.
+Changing the item or query, replacing candidates, or closing the window invalidates pending confirmation; a late
+`accept()` returns `false`. Asynchronous callbacks must check `is_cancelled()` first and use `vim.schedule`
+to return from a fast callback to the main thread.
 
-`on_close(picker, outcome)` 的 `outcome.reason` 为 `"confirm"` 或 `"cancel"`，
-原有单参数回调兼容；仍先清理窗口、恢复焦点，再调用 `on_close` 和 `on_choice`。
-事务型选择器应设置 `resume = false`，避免恢复绑定旧请求的回调。
+For `on_close(picker, outcome)`, `outcome.reason` is `"confirm"` or `"cancel"`.
+Existing single-argument callbacks remain compatible. Windows are cleaned up and focus is restored before `on_close` and `on_choice` run.
+Transactional pickers should set `resume = false` to avoid restoring callbacks tied to old requests.
 
-### 外部 diff provider
+### External diff provider
 
 ```lua
 require("selection_tools").open({
@@ -164,13 +164,13 @@ require("selection_tools").open({
     enabled = true,
     providers = {
       require("git_tools.integrations.selection").diff({
-        backend = "vim", -- 或 delta；不依赖 Snacks
+        backend = "vim", -- Or delta; no Snacks dependency
         delta = { command = "delta", args = {}, timeout = 2000 },
       }),
     },
   },
   before_confirm = function(ctx)
-    return validate_changes(ctx.item) -- true 或 false, message
+    return validate_changes(ctx.item) -- true or false, message
   end,
   on_choice = function(item)
     if item then apply_changes() end
@@ -178,30 +178,30 @@ require("selection_tools").open({
 })
 ```
 
-diff 生成和原生/delta 渲染由独立的 `git-tools.nvim` 提供。使用此示例前，
-将 git-tools.nvim 加入 runtimepath；普通选择窗口无需安装或加载它。
-原 `selection_tools.providers.diff` 已迁出：provider 改用
-`git_tools.integrations.selection.diff(opts)`，直接渲染改用
-`git_tools.diff.render(ctx, lines, opts, valid)`。直接调用时显式传入 `opts.cwd`。
-selection-tools 保留窗口、焦点、确认和预览帧生命周期；调用方负责变更校验和应用。
+The standalone `git-tools.nvim` provides diff generation and native/delta rendering. Before using this example,
+add git-tools.nvim to runtimepath; ordinary pickers do not need it installed or loaded.
+The former `selection_tools.providers.diff` module has moved: use
+`git_tools.integrations.selection.diff(opts)` for a provider and
+`git_tools.diff.render(ctx, lines, opts, valid)` for direct rendering. Pass `opts.cwd` explicitly for direct calls.
+selection-tools retains ownership of windows, focus, confirmation, and preview frame lifecycles; the caller validates and applies changes.
 
-`ctx.set_buffer(buf, { owned = true, title = "Preview" })` 可接管新预览帧。
-旧帧保留到新帧就绪，之后释放；窗口关闭也会释放拥有的 buffer。
-省略 `owned` 时 buffer 始终归调用方所有，不会删除。过期的拥有帧会被清理。
-通用 provider 的 `ctx` 还包含 `picker`；`paint()` 和 `set_lines()` 会安全切回
-内部文本 buffer，支持在 ANSI、图片和普通文本之间切换。
+`ctx.set_buffer(buf, { owned = true, title = "Preview" })` installs a new preview frame.
+The old frame remains until the new one is ready, then is released. Closing the window also releases owned buffers.
+If `owned` is omitted, the buffer remains caller-owned and is never deleted. Stale owned frames are cleaned up.
+The generic provider `ctx` also includes `picker`; `paint()` and `set_lines()` safely switch back to
+the internal text buffer, supporting transitions between ANSI, images, and plain text.
 
-### 自定义 provider
+### Custom providers
 
-`preview.providers` 按顺序调用 `function(ctx)`；返回 `false` / `nil` 表示交给下一个 provider 或默认文件预览。返回 `true`、取消函数，或带 `close()` / 可选 `resize()` 的对象表示接管。调用者提供的 `preview_item` 和搜索源自带的 `previewer` 保留优先级。
+`preview.providers` calls each `function(ctx)` in order. Returning `false` / `nil` passes control to the next provider or the default file preview. Returning `true`, a cancellation function, or an object with `close()` and optional `resize()` takes ownership. Caller-supplied `preview_item` and source-supplied `previewer` callbacks retain priority.
 
-`ctx` 包含 `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`。`ctx.paint(draw, { title = ... })` 在一次受有效期检查的主线程事务中调用 `draw(buf,win)`，支持同步写行和添加 extmark，自动恢复 buffer 的可写标志。主线程调用同步完成；fast callback 调用会整体调度，过期工作被丢弃。图像占位符应通过 `paint` 绘制，避免在异步 `set_lines` 后立即添加高亮。缩放调用返回对象的 `resize()`。换项时若对象提供 `retain()`，可返回一个只保留已就绪显示的句柄，通过下次 `ctx.previous` 传递；`ctx.has_preview` 表示已有内容。新 `paint` / `set_lines` 完成后或取消时关闭保留句柄；不支持保留的 provider 仍立即调用取消函数或 `close()`。
+`ctx` includes `item/index/path/source_buf/buf/win/is_cancelled()/set_lines()`. `ctx.paint(draw, { title = ... })` calls `draw(buf,win)` in a single main-thread transaction guarded against stale requests, supporting synchronous line writes and extmarks while automatically restoring the buffer's writable flag. Main-thread calls complete synchronously; fast callbacks schedule the whole transaction and discard stale work. Draw image placeholders with `paint` rather than adding highlights immediately after asynchronous `set_lines`. Resizing calls the returned object's `resize()`. When switching items, an object with `retain()` can return a handle that keeps only its ready display, passed to the next provider as `ctx.previous`; `ctx.has_preview` indicates existing content. The retained handle closes after new `paint` / `set_lines` work completes or on cancellation. Providers without retention support still have their cancellation function or `close()` called immediately.
 
-## 流式全文搜索
+## Streaming full-text search
 
-Grep 边接收 ripgrep JSON 边展示结果，分批解析时保持输入可响应；追加结果保留当前条目和多选标记。达到 `limit`（默认 10000）、`max_output`（默认 32 MiB）或 `max_line_bytes`（默认 1 MiB）后停止进程，右下角显示 `Limit reached`，具体原因可读取 `picker.truncated`。达到结果上限表示“上限已到”，不代表总命中数已知。新查询、切换选项及关闭窗口会取消旧进程并丢弃迟到的数据。
+Grep displays results as ripgrep JSON arrives, parsing in batches to keep input responsive. Appended results preserve the current item and selection marks. Reaching `limit` (10000 by default), `max_output` (32 MiB), or `max_line_bytes` (1 MiB) stops the process and shows `Limit reached` at the bottom right; `picker.truncated` records the reason. Reaching a limit does not establish the total number of matches. New queries, option changes, and window closure cancel old processes and discard late data.
 
-## 匹配后端
+## Matching backends
 
 ```lua
 require("selection_tools").setup({
@@ -218,17 +218,17 @@ require("selection_tools").setup({
 })
 ```
 
-默认按候选总数切换：少于 5 万条用 Neovim 原生匹配，达到阈值后异步调用 skim。阈值可按机器和数据调整，不随当前命中数量来回切换。原生匹配只向 `matchfuzzypos()` 传递字符串，返回后映射回原始对象；同名条目仍保留各自的索引和对象身份。
+By default, the backend depends on the total candidate count: Neovim native matching below 50000 candidates, asynchronous skim at or above the threshold. Adjust the threshold for your machine and data; it does not switch back and forth with the current match count. Native matching passes only strings to `matchfuzzypos()` and maps results back to the original objects. Items with identical labels retain their own indices and object identities.
 
-skim 只负责过滤、排序，继续使用本插件的窗口、预览、多选和按键。候选数据编码后缓存；每次查询有独立的异步进程和代次，快速输入、清空查询、替换候选或关闭窗口都会取消旧任务，并忽略迟到的结果。大批结果分批解析，可见行才计算匹配高亮。处理期间保留当前列表、选中位置和预览，并暂停确认，避免选到旧查询的结果。
+skim handles only filtering and ranking; this plugin still provides windows, previews, multiple selection, and key bindings. Encoded candidates are cached. Each query has a separate asynchronous process and generation; rapid typing, clearing the query, replacing candidates, or closing the window cancels old work and ignores late results. Large result sets are parsed in batches, with match highlights computed only for visible rows. The current list, selection, and preview remain visible during processing, and confirmation is paused to avoid selecting results from an old query.
 
-两个引擎的评分与排名可能不同。为保留原来的字面、顺序匹配语义，包含空白、`! ^ $ | ' "`、反斜杠或超长查询时使用原生匹配，显式选择 `skim` 也遵循这一规则。空查询、空候选和 `match = false` 不启动 skim。缺少可执行文件时静默回退；执行失败、超时或返回异常时提醒一次，该 picker 后续使用原生匹配。用户的 `SKIM_DEFAULT_OPTIONS` 不会注入到匹配命令中。
+The engines may produce different scores and rankings. To preserve the existing literal, ordered matching semantics, queries containing whitespace, `! ^ $ | ' "`, backslashes, or excessive length use native matching even when `skim` is explicitly selected. Empty queries, empty candidate lists, and `match = false` do not start skim. A missing executable silently falls back to native matching. Execution failures, timeouts, or malformed output trigger one warning, then that picker uses native matching for subsequent queries. The user's `SKIM_DEFAULT_OPTIONS` are not injected into the matching command.
 
-可通过每次调用的 `matcher` 选项覆盖全局设置。`picker:matcher_status()` 返回 `{ backend = "none" | "native" | "skim", pending = boolean, error = string | nil }`，其中 `none` 表示无需本地匹配；`error` 记录最近的回退原因。
+Override global settings with the per-call `matcher` option. `picker:matcher_status()` returns `{ backend = "none" | "native" | "skim", pending = boolean, error = string | nil }`, where `none` means no local matching is needed and `error` records the most recent fallback reason.
 
-## 窗口、预览与操作
+## Windows, previews, and actions
 
-下面的配置对应纵向的 Snacks picker：上方预览占 60%，中间反向列表，下方输入框。整个窗口宽 80%、高 90%，使用一个外框和内部分隔线，不绘制遮罩。匹配数 / 总数显示在输入框右侧；分隔线与外框相连，不显示预览文件名。预览显示绝对行号。
+The following configuration resembles a vertical Snacks picker: a preview occupying the top 60%, a reversed list in the middle, and input at the bottom. The overall window uses 80% width and 90% height, with a single outer border and internal separators, without a backdrop. The input shows the match/total count on the right. Separators connect to the border, the preview filename is hidden, and the preview shows absolute line numbers.
 
 ```lua
 require("selection_tools").setup({
@@ -254,19 +254,19 @@ require("selection_tools").setup({
 })
 ```
 
-`next` / `previous` 按屏幕方向移动；`select_previous` / `select_next` 标记当前项后按候选排名移动。多选标记在本地筛选时保留，替换候选列表时清除。文件确认会将标记文件加入 buffer 列表并显示第一个；没有标记时打开当前项。复制和系统打开都优先作用于标记项，否则作用于当前项，执行后保留搜索窗口。
+`next` / `previous` move in screen directions; `select_previous` / `select_next` mark the current item and then move by candidate rank. Marks survive local filtering and are cleared when candidates are replaced. Confirming files adds the marked files to the buffer list and displays the first one; without marks, it opens the current item. Copy and system-open actions prefer marked items, falling back to the current item, and leave the picker open.
 
-预览异步读取普通文件，带文件类型高亮；已加载 buffer 优先使用未保存内容。默认限制为 1 MiB、10000 行、每行 1000 字节；超大文件和二进制文件显示提示。切换条目和关闭窗口会使旧预览失效。预览滚动和列表翻页都保持搜索框焦点。
+Previews read ordinary files asynchronously with filetype highlighting, preferring unsaved content from loaded buffers. Default limits are 1 MiB, 10000 lines, and 1000 bytes per line; oversized and binary files show a message. Switching items or closing the window invalidates old previews. Preview scrolling and list paging keep focus in the search input.
 
-`select()` / `vim.ui.select` 默认使用独立的紧凑布局：输入框在上、正向列表在下、宽度 50%（80–100 列，自动适应窄屏）、高度 40%。可用 `setup({ select = { layout = ... } })` 配置。若调用者提供 `preview_item`，则展示该回调返回的 buffer，并保留其高亮；插件不会修改或主动删除调用者的 buffer。
+`select()` / `vim.ui.select` use a separate compact layout by default: input on top, a forward list below, 50% width (80–100 columns, adapting to narrow screens), and 40% height. Configure it with `setup({ select = { layout = ... } })`. When the caller provides `preview_item`, the returned buffer is displayed with its highlights preserved; the plugin does not modify or proactively delete caller-owned buffers.
 
-查询历史按搜索源保存。默认只保存在会话内；启用 `history.persist` 后保存到 `stdpath("state")/selection-tools/history.json`，也可指定 `history.path`。向前浏览到末尾会恢复本次尚未提交的查询。
+Query history is stored per source. By default it lasts only for the session. Enable `history.persist` to save it to `stdpath("state")/selection-tools/history.json`, or set `history.path`. Moving forward past the newest entry restores the draft query from before history browsing.
 
-## 供其他插件调用
+## API for other plugins
 
-### 直接选择条目
+### Selecting items directly
 
-`select()` 与 `vim.ui.select` 的基础调用约定一致，额外返回 picker 对象：
+`select()` follows the basic `vim.ui.select` calling convention and also returns a picker object:
 
 ```lua
 local actions = {
@@ -282,13 +282,13 @@ require("selection_tools").select(actions, {
 end)
 ```
 
-筛选后仍返回原始 Lua 对象和原列表索引；取消时回调收到 `nil, nil`。每个窗口只调用一次回调，调用前会清理窗口并恢复原窗口焦点。打开新 picker 会取消已有 picker。`open()` 可通过 `multi = true` 启用多选；确认回调的第三个参数是标记条目列表（没有标记时包含当前项），前两个参数仍是当前条目和索引。
+Filtering preserves the original Lua object and its index in the original list. Cancellation calls the callback with `nil, nil`. Each picker calls its callback once, after cleaning up windows and restoring the original focus. Opening a new picker cancels the existing one. Enable multiple selection in `open()` with `multi = true`; the confirmation callback's third argument is the list of marked items (or the current item if none are marked), while the first two remain the current item and its index.
 
-标记第一项后，列表左侧显示选择状态列：`○ │ item` 表示未选择，`● │ item` 表示已选择。标记被筛选隐藏时仍保留状态列；取消全部标记后收起。
+Marking the first item reveals a selection column on the left: `○ │ item` is unmarked, and `● │ item` is marked. The column stays visible when filtering hides marked items and collapses after all marks are cleared.
 
-未选圆圈和竖线使用主题的 `Comment` 灰色，已选圆圈使用 `Special` 强调色，可分别通过 `SelectionToolsUnmarked`、`SelectionToolsMarkSeparator`、`SelectionToolsMarked` 高亮组覆盖。未显示状态列时，图标左侧同样保留一格 padding。
+Unmarked circles and separators use the theme's `Comment` gray; marked circles use the `Special` accent. Override them with `SelectionToolsUnmarked`, `SelectionToolsMarkSeparator`, and `SelectionToolsMarked`, respectively. When the selection column is hidden, one cell of padding remains to the left of icons.
 
-### 注册搜索源
+### Registering sources
 
 ```lua
 local selection = require("selection_tools")
@@ -304,18 +304,18 @@ selection.register_source("tasks", function(opts)
 end)
 
 selection.pick("tasks", { query = "te" })
--- 也可通过 :SelectionTools tasks 打开
+-- Also available through :SelectionTools tasks
 ```
 
-搜索源可以是配置表，也可以是接收调用选项并返回配置表的函数。`pick(name, opts)` 的选项覆盖搜索源默认值。
+A source can be a configuration table or a function that receives call options and returns a configuration table. Options passed to `pick(name, opts)` override source defaults.
 
-### 异步或动态搜索
+### Asynchronous or dynamic search
 
 ```lua
 local picker = require("selection_tools").open({
   prompt = "Remote results",
-  live = true, -- 每次查询变化时重新调用 finder；默认只调用一次
-  match = false, -- 已由搜索源过滤和排序时关闭本地模糊匹配
+  live = true, -- Run finder again on each query change; by default it runs once
+  match = false, -- Disable local fuzzy matching when the source filters and ranks results
   finder = function(ctx)
     local process = vim.system({ "my-search", ctx.query }, { text = true }, function(result)
       if ctx.is_cancelled() then return end
@@ -336,17 +336,17 @@ local picker = require("selection_tools").open({
 })
 ```
 
-`ctx.set_items()` 替换候选列表；`ctx.done()` 结束加载；`ctx.fail(message)` 显示错误。这些方法可直接从异步回调调用。关闭窗口或更新 live 查询时，会执行 finder 返回的取消函数，旧请求结果会被丢弃。live 源重启时保留旧列表直到新结果可用，等待期间暂停确认，避免选到旧查询结果。
+`ctx.set_items()` replaces candidates, `ctx.done()` finishes loading, and `ctx.fail(message)` displays an error. These methods can be called directly from asynchronous callbacks. Closing the window or updating a live query runs the finder's returned cancellation function and discards old results. Restarting a live source keeps the old list until new results are ready, with confirmation paused to avoid selecting results from an old query.
 
-搜索源可通过 `highlight_item(item, original_index)` 返回 `{{start_byte, end_byte}, ...}`，为格式化条目的指定范围使用 `SelectionToolsMatch` 高亮。范围基于 `format_item` 返回的原始字符串，使用从 0 开始、右侧不包含的字节偏移；图标、多选标记和 Tab 等控制字符的显示转换由渲染器处理。回调仅对可见候选调用，结果缓存到候选被替换。grep 使用 ripgrep 返回的真实命中范围，不重新解释正则或进行模糊匹配。
+Sources can return `{{start_byte, end_byte}, ...}` from `highlight_item(item, original_index)` to highlight ranges of formatted items with `SelectionToolsMatch`. Ranges use zero-based, end-exclusive byte offsets into the original string returned by `format_item`; the renderer handles display transformations for icons, selection marks, tabs, and other control characters. The callback runs only for visible candidates, with results cached until candidates are replaced. Grep uses ripgrep's actual match ranges without reinterpreting regexes or applying fuzzy matching.
 
-返回的 picker 提供 `set_query(query)`、`set_items(items)`、`move(delta)`、`current()`、`confirm()` 和 `close()`。`current()` 返回当前条目及其原始索引；`close()` 表示取消。
+The returned picker provides `set_query(query)`, `set_items(items)`, `move(delta)`, `current()`, `confirm()`, and `close()`. `current()` returns the current item and its original index; `close()` cancels.
 
-预览可由搜索源扩展：`preview = { enabled = true }` 开启预览，`previewer(ctx)` 接收 `item`、`index`、`buf`、`win`、`is_cancelled()` 和 `set_lines(lines, filetype, title, position)`。`set_lines` 可从异步回调调用；previewer 可返回取消函数。`actions = { name = function(picker) ... end }` 可定义额外操作，再通过 `keys.name` 配置按键。
+Sources can extend previews: `preview = { enabled = true }` enables them, and `previewer(ctx)` receives `item`, `index`, `buf`, `win`, `is_cancelled()`, and `set_lines(lines, filetype, title, position)`. `set_lines` supports asynchronous callbacks; the previewer may return a cancellation function. Define additional actions with `actions = { name = function(picker) ... end }` and bind them through `keys.name`.
 
-详见 `:help selection-tools`，包括配置、按键和完整 API。
+See `:help selection-tools` for configuration, key bindings, and the full API.
 
-## 验证
+## Validation
 
 ```sh
 stylua --check lua plugin tests
@@ -361,61 +361,61 @@ nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
-# 可选：真实 image-tools API 和媒体/缓存联动，Kitty 应答由测试模拟
+# Optional: real image-tools API and media/cache integration; tests simulate Kitty responses
 IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py
 ```
 
-测试覆盖对象与索引保留、取消和生命周期、异步过期结果、文件搜索后端、各内置搜索源的确认行为和真实终端输入。图标目录的下载、缓存、失败及取消测试使用离线模拟。已安装 skim 时，还会运行真实 skim 测试，以及 6 万条候选的连续输入、预览和多选终端测试；未安装时跳过这些外部集成测试。终端测试使用 Python 标准库的 PTY，适用于 macOS/Linux。
+Tests cover object/index preservation, cancellation and lifecycle, stale asynchronous results, file search backends, confirmation behavior of built-in sources, and real terminal input. Icon catalog downloads, caching, failures, and cancellation use offline mocks. When skim is installed, tests also exercise real skim and terminal typing, previews, and multiple selection with 60000 candidates; otherwise these external integration tests are skipped. Terminal tests use Python's standard-library PTY support on macOS/Linux.
 
-## 内置搜索源
+## Built-in sources
 
-- `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`：实时全文搜索，默认按字面字符串搜索，使用 ripgrep 的 smart case；`regex = true` 开启正则。结果带行列位置，确认后跳转；列表高亮每行全部实际命中范围，支持字面搜索和正则匹配，空查询不扫描目录。
+- `grep({ cwd, query, regex = false, hidden, ignored, limit = 10000 })`: live full-text search, using literal strings and ripgrep smart case by default; `regex = true` enables regular expressions. Results carry line/column positions and jump there on confirmation. The list highlights every actual match on each line for both literal and regex searches. Empty queries do not scan directories.
 
-- `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`：合并当前项目、最近文件的项目根目录、显式目录和开发目录扫描；确认后切换工作目录并打开文件搜索。`open_files = false` 仅切换目录。
+- `projects({ projects, dev, recent = true, max_depth = 2, open_files = true })`: combines the current project, project roots from recent files, explicit directories, and development-directory scans. Confirmation changes the working directory and opens file search; `open_files = false` only changes directories.
 
-- `recent({ cwd, buffers = true })`：按最近使用顺序合并已列出的文件 buffer 和 `v:oldfiles`，跳过已删除文件并对路径别名去重；显式 `cwd` 可限定目录。
+- `recent({ cwd, buffers = true })`: merges listed file buffers and `v:oldfiles` by recency, skipping deleted files and deduplicating path aliases. An explicit `cwd` restricts the directory.
 
-- `resume()` / `:SelectionTools resume`：恢复上次 picker 的搜索源、查询、选中位置、多选标记和预览滚动。静态列表保留原始对象，实时或未完成的搜索重新加载；`resume = false` 可禁用单个 picker 的记录。
+- `resume()` / `:SelectionTools resume`: restores the last picker's source, query, current selection, marks, and preview scroll position. Static lists retain their original objects; live or unfinished searches reload. Use `resume = false` to disable recording for a picker.
 
-- `todo_comments({ cwd, keywords })`：按 `KEYWORD:` 扫描 TODO 标记，默认包含 NOTE；若 todo-comments 已配置则读取其关键字与别名，也可显式限定关键字列表。独立使用不依赖 todo-comments 插件。
+- `todo_comments({ cwd, keywords })`: scans `KEYWORD:` TODO markers, including NOTE by default. Reads configured keywords and aliases from todo-comments when available, or accepts an explicit keyword list. Standalone use does not require the todo-comments plugin.
 
-- `registers({ registers, register = "+" })`：搜索非空寄存器并预览多行内容，确认后复制内容和寄存器类型到目标寄存器；默认避免主动读取 OSC 52 剪贴板。
+- `registers({ registers, register = "+" })`: searches nonempty registers and previews multiline content. Confirmation copies content and register type to the target register. Avoids proactively reading the OSC 52 clipboard by default.
 
-- `jumps()`：查看当前窗口的原生跳转列表，确认时按 jump list 索引执行原生前进/后退，保留后续跳转语义。
+- `jumps()`: browses the current window's native jump list. Confirmation moves forward/backward by native jump-list index, preserving subsequent jump behavior.
 
-- `marks()`：合并当前 buffer 的局部标记与全局标记，显示并预览精确位置，确认后跳转。
+- `marks()`: combines local marks from the current buffer with global marks, displays and previews exact locations, and jumps on confirmation.
 
-- `undo()`：搜索原生撤销树（含分支），在独立克隆中读取历史内容；安装 git-tools.nvim 时使用其 diff API 预览差异，否则显示完整历史快照；仅确认时更改原 buffer，若原内容已改变则拒绝套用旧状态。临时撤销文件和克隆在关闭时清理。
+- `undo()`: searches the native undo tree, including branches, and reads historical content in an isolated clone. Uses git-tools.nvim's diff API for previews when installed, otherwise displays the full historical snapshot. Only confirmation changes the original buffer; stale states are rejected if its content has changed. Temporary undo files and clones are cleaned up on close.
 
-- `search_history()`：搜索历史选择会恢复搜索寄存器，并在原窗口执行所选搜索。
+- `search_history()`: restores the search register and runs the selected search in the original window.
 
-- `command_history()`：按最近顺序选择命令历史；确认后在原窗口执行命令。
+- `command_history()`: selects command history in recency order and executes the chosen command in the original window.
 
-- `qflist()`：选择 Quickfix 条目，预览文件并保留原生列表索引；列表变化后拒绝使用过期位置。
+- `qflist()`: selects Quickfix entries, previews files, and preserves native list indices. Rejects stale positions if the list changes.
 
-- `loclist()`：从调用窗口读取 Location list，并在该窗口跳转；不会读取 picker 窗口的列表。
+- `loclist()`: reads the calling window's Location list and jumps in that window, rather than reading the picker window's list.
 
-- `commands()`：搜索内置、全局和当前缓冲区命令；默认填入命令行以便补充参数，execute=true 可直接执行。
+- `commands()`: searches built-in, global, and buffer-local commands. Fills the command line by default so arguments can be added; `execute=true` runs the command directly.
 
-- `autocmds()`：搜索事件、分组、pattern 和说明，预览完整定义；确认后定位 Lua 定义或打开只读详情。
+- `autocmds()`: searches events, groups, patterns, and descriptions, and previews full definitions. Confirmation locates the Lua definition or opens read-only details.
 
-- `keymaps()`：搜索全局及当前缓冲区各模式映射，预览定义；确认后沿用 Snacks 的 Normal 模式按键回放。action="definition" 可改为定位定义。
+- `keymaps()`: searches global and buffer-local mappings across modes and previews definitions. Confirmation uses Normal mode key replay following Snacks behavior; set `action="definition"` to locate the definition instead.
 
-- `help()`：搜索 runtime 中的 help tags，预览定位到标签，确认后打开原生帮助文档。窗口显示后异步读取并分批解析；缓存按标签文件元数据及 runtime 顺序失效。
+- `help()`: searches runtime help tags, previews their locations, and opens native help on confirmation. Tag files are read asynchronously and parsed in batches after the window appears. Cache invalidation follows tag-file metadata and runtime order.
 
-- `man()`：从 manpath 的本地手册目录索引页面，异步调用 man 预览，确认后用原生 :Man 打开；paths 可指定目录。
+- `man()`: indexes pages from local manpath directories, previews them through asynchronous `man` calls, and opens them with native `:Man` on confirmation. Use `paths` to specify directories.
 
-- `spelling()`：在原窗口替换光标处单词，保留其他同名词；原文发生变化后拒绝过期替换。沿用原 spelling 的上方输入、小窗口布局。
+- `spelling()`: replaces the word under the cursor in the original window, preserving other occurrences. Rejects stale replacements if the original text changes. Retains the compact spelling layout with input on top.
 
-- `highlights()`：搜索高亮组，预览真实样式、链接和解析后的颜色属性；确认关闭，C-y 可复制名称。
+- `highlights()`: searches highlight groups and previews actual styles, links, and resolved color attributes. Confirmation closes the picker; `<C-y>` copies the name.
 
-- `icons()`：搜索 Nerd Fonts、Emoji、可选 devicons 和内置符号，确认后插入原 buffer。首次异步下载并缓存公开字形目录；icon_sources={} 禁用下载，icons 或 custom_sources 可提供本地目录。
+- `icons()`: searches Nerd Fonts, Emoji, optional devicons, and built-in symbols, then inserts the selection in the original buffer. Public glyph catalogs are downloaded asynchronously and cached on first use. `icon_sources={}` disables downloads; `icons` or `custom_sources` can supply local catalogs.
 
-所有搜索源均可通过 `pick(name, opts)`、同名 Lua 函数或 `:SelectionTools name` 调用。需要实时全文搜索的快捷键可调用 `grep({ regex = true })`，保持原 Snacks 正则搜索语义。
+All sources are available through `pick(name, opts)`, the Lua function with the same name, or `:SelectionTools name`. Keymaps for live full-text search can use `grep({ regex = true })` to retain the original Snacks regex search behavior.
 
-图标目录来自 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) 和 [unicode-emoji-json](https://github.com/muan/unicode-emoji-json)，首次下载需要 curl；失败时仍可使用本地符号和 devicons。`custom_sources = { name = "/path/icons.json" }` 接受 `[{"icon":"λ","name":"lambda","category":"math"}]` 或 `[["λ","lambda"]]`。远程目录缓存位于 `stdpath("cache")/selection-tools/icons/`。
+Icon catalogs come from [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) and [unicode-emoji-json](https://github.com/muan/unicode-emoji-json). The initial download requires curl; local symbols and devicons remain available if it fails. `custom_sources = { name = "/path/icons.json" }` accepts `[{"icon":"λ","name":"lambda","category":"math"}]` or `[["λ","lambda"]]`. Remote catalogs are cached under `stdpath("cache")/selection-tools/icons/`.
 
-高亮属性、快捷键/自动命令定义和用户命令详情仅在预览当前项时生成；快捷键定义定位在一次 picker 中复用脚本索引，新 picker 会重新读取。
+Highlight attributes, keymap/autocommand definitions, and user-command details are generated only when the current item is previewed. Keymap definition lookup reuses a script index within each picker and refreshes it for a new picker.
 
-帮助、高亮、快捷键、自动命令、命令和项目搜索会先显示窗口，再分批准备候选；加载期间可继续输入或取消，候选完成后应用当前查询。项目扫描在一次加载内复用已找到及未找到的项目根目录。懒加载测试同时验证启动只注册轻量入口，以及真实终端中加载时的输入、取消、文件句柄清理和缓存复用。
+Help, highlights, keymaps, autocommands, commands, and projects show the window before preparing candidates in batches. Input and cancellation remain available during loading, and the current query is applied when candidates are ready. Project scans reuse both found and missing project roots within a load. Lazy-loading tests verify lightweight entry-point registration at startup, plus input, cancellation, file-handle cleanup, and cache reuse during loading in a real terminal.
