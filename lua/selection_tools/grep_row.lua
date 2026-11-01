@@ -53,7 +53,7 @@ end
 function M.info(entry)
   if not entry.grep_info or entry.grep_info.ambiwidth ~= vim.o.ambiwidth then
     local item = entry.item
-    local code = clean(item.code)
+    local code = clean(item.display_code or item.code)
     local file = clean(item.display_file or vim.fn.fnamemodify(item.file, ":~:."))
     local suffix = (":%d:%d"):format(item.pos[1], item.pos[2] + 1)
     entry.grep_info = {
@@ -74,8 +74,8 @@ function M.file_width(cells, wanted)
   local minimum_code = cells >= 28 and 16 or 8
   return math.min(wanted, math.max(8, math.min(math.floor(cells * 0.4), cells - 2 - minimum_code)))
 end
-local function snippet(code, cells, focus, focus_end)
-  local start = #(code:match("^%s*") or "")
+local function snippet(code, cells, focus, focus_end, preserve_indent)
+  local start = preserve_indent and 0 or #(code:match("^%s*") or "")
   if focus then
     start = math.min(start, boundary(code, focus))
   end
@@ -101,6 +101,14 @@ local function snippet(code, cells, focus, focus_end)
 end
 function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
   local info = M.info(entry)
+  local focus, focus_end
+  for _, range in ipairs(matches) do
+    if range[2] > info.offset then
+      focus = math.max(0, range[1] - info.offset)
+      focus_end = math.min(#info.code, range[2] - info.offset)
+      break
+    end
+  end
   icon_width = icon_width or (icon and width(icon.text) or 0)
   local key = cells
     .. ":"
@@ -113,21 +121,17 @@ function M.render(entry, cells, file_cells, mark, icon, matches, icon_width)
     .. icon_width
     .. ":"
     .. vim.o.ambiwidth
+    .. ":"
+    .. (focus or "")
+    .. ":"
+    .. (focus_end or "")
   if entry.grep_render_key == key then
     return entry.grep_render
   end
   local available = math.max(0, cells - width(mark))
   local gap = file_cells > 0 and 2 or 0
   local code_cells = math.max(0, available - gap - file_cells)
-  local focus, focus_end
-  for _, range in ipairs(matches) do
-    if range[2] > info.offset then
-      focus = math.max(0, range[1] - info.offset)
-      focus_end = math.min(#info.code, range[2] - info.offset)
-      break
-    end
-  end
-  local code, first, last, leading = snippet(info.code, code_cells, focus, focus_end)
+  local code, first, last, leading = snippet(info.code, code_cells, focus, focus_end, entry.item.display_indent)
   local result = { text = mark .. code, segments = { { info.offset + first, info.offset + last, #mark + leading } } }
   if file_cells > 0 then
     local glyph = icon and icon.text or ""

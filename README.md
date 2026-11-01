@@ -356,6 +356,7 @@ nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
+nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua

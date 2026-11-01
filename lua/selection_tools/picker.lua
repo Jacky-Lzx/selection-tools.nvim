@@ -350,8 +350,18 @@ function Picker:_render()
     local entry = self.matches[index]
     local prefix = show_marks and ((self.marks[entry.index] and "●" or "○") .. " │ ") or ""
     if columns then
-      rows[row] =
-        columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], self:_highlights(entry), icon_width)
+      local focus = vim.tbl_filter(function(range)
+        return range.hl == nil or range.hl == "SelectionToolsMatch"
+      end, self:_highlights(entry))
+      if #focus == 0 then
+        if not self.positions[index] and self.match_backend == "skim" then
+          self.positions[index] = vim.fn.matchfuzzypos({ entry.text }, self.query, { matchseq = 1 })[2][1] or {}
+        end
+        for _, pos in ipairs(self.positions[index] or {}) do
+          focus[#focus + 1] = { vim.fn.byteidx(entry.text, pos), vim.fn.byteidx(entry.text, pos + 1) }
+        end
+      end
+      rows[row] = columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width)
     else
       if icon_width > 0 and not show_marks then
         prefix = " "
@@ -429,7 +439,7 @@ function Picker:_render()
         highlight(span[1], span[2], span.hl, span.priority)
       end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
-        highlight(range[1], range[2], "SelectionToolsMatch", 110)
+        highlight(range[1], range[2], range.hl or "SelectionToolsMatch", range.priority or 110)
       end
       for _, pos in ipairs(self.positions[index] or {}) do
         highlight(

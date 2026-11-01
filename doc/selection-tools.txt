@@ -164,6 +164,10 @@ UTF-8 characters. Narrow layouts omit icons/line positions, then hide the file
 column entirely. Syntax/query ranges follow clipped code; original item data,
 copied paths and navigation remain intact. result_layout="plain" restores the
 file-first layout.
+Custom sources can reuse result_layout="grep" with item.file (or display_file),
+item.pos and item.code. Optional item.display_code supplies a separate left label
+without changing source code, preview ranges or exported values; display_indent
+preserves its leading whitespace. The formatted label must end with that content.
 Search controls (files/grep): ALT-H hidden, ALT-I ignored, ALT-F directory,
 ALT-G comma-separated file globs (! excludes). Grep also supports ALT-R regex
 and ALT-C case (smart/sensitive/ignore). Flags appear in the title. Changes
@@ -240,6 +244,9 @@ selection.open(opts)
                      matching. Only visible entries resolve and cache ranges;
                      replacing candidates resets the cache. Icons/marks and
                      escaped control bytes are accounted for by the renderer.
+                     Ranges may set hl and priority for semantic content colors;
+                     default SelectionToolsMatch priority is 110. Use a lower
+                     priority (for example 100) to retain query-match highlights.
       item_icons     { enabled=true }. false or { enabled=false } disables
                      automatic and custom item icons.
       format_icon    Optional fun(item, original_index): glyph, highlight_group.
