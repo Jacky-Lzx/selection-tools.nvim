@@ -208,6 +208,75 @@ test("static async source scans once and filters cached items", function()
   p:close()
 end)
 
+test("live searches retain rows until replacement, empty completion or failure", function()
+  local contexts, choices = {}, 0
+  local p = tools.open({
+    live = true,
+    match = false,
+    multi = true,
+    finder = function(ctx)
+      contexts[#contexts + 1] = ctx
+    end,
+    on_choice = function()
+      choices = choices + 1
+    end,
+  })
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "" })
+  contexts[1].set_items({ "first", "second" })
+  contexts[1].done()
+  drain()
+  p:move(1)
+  p:toggle()
+  local function view()
+    return {
+      vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false),
+      vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true }),
+      vim.api.nvim_win_get_cursor(p.list_win),
+      vim.api.nvim_buf_get_extmarks(p.frame_buf, -1, 0, -1, { details = true }),
+    }
+  end
+  local displayed = view()
+  p:set_query("n")
+  eq(view(), displayed)
+  p:confirm()
+  eq(choices, 0)
+  assert(not p.closed)
+  contexts[2].set_items({})
+  contexts[2].append_items({})
+  drain()
+  eq(view(), displayed)
+  p:set_query("new")
+  contexts[2].append_items({ "stale" })
+  contexts[2].done()
+  drain()
+  eq(view(), displayed)
+  contexts[3].append_items({ "new result" })
+  drain()
+  eq(#p.matches, 1)
+  eq(p:current(), "new result")
+  eq(p:selected(), {})
+  contexts[3].append_items({ "another result" })
+  contexts[3].done()
+  drain()
+  eq(#p.matches, 2)
+  p:set_query("none")
+  contexts[4].done()
+  drain()
+  eq(#p.matches, 0)
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "No results" })
+  p:set_query("again")
+  contexts[5].set_items({ "replacement" })
+  contexts[5].done()
+  drain()
+  eq(p:current(), "replacement")
+  p:set_query("error")
+  contexts[6].fail("search failed")
+  drain()
+  eq(#p.matches, 0)
+  eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), { "Error: search failed" })
+  p:close()
+end)
+
 test("finder errors are visible and picker stays cancellable", function()
   local p = tools.open({
     finder = function()
@@ -822,7 +891,7 @@ end
 
 local fake_matcher = { backend = "skim", skim = { command = "selection-test-sk", debounce_ms = 0 } }
 
-test("async skim cancels stale queries, clears old choices and preserves identity", function()
+test("async skim cancels stale queries, retains visible choices and preserves identity", function()
   fake_skim(function(jobs)
     local old, new = { text = "old" }, { text = "new", run = function() end }
     local choices = 0
@@ -836,18 +905,25 @@ test("async skim cancels stale queries, clears old choices and preserves identit
         choices = choices + 1
       end,
     })
+    local lines = vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false)
     p:set_query("old")
-    assert(p.matching and p:current() == nil)
+    assert(p.matching and p:current() == old)
+    eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), lines)
     p:confirm()
     eq(choices, 0)
     p:set_query("new")
+    eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), lines)
     assert(jobs[1].killed)
     jobs[2].callback({ code = 0, stdout = "2\tnew\0", stderr = "" })
     jobs[1].callback({ code = 0, stdout = "1\told\0", stderr = "" })
     drain()
     assert(p:current() == new)
     eq(p:matcher_status().backend, "skim")
+    lines = vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false)
+    local positions = vim.deepcopy(p.positions)
     p:set_query("old")
+    eq(vim.api.nvim_buf_get_lines(p.list_buf, 0, -1, false), lines)
+    eq(p.positions, positions)
     p:set_items({ { text = "replacement" } })
     assert(jobs[3].killed)
     jobs[3].callback({ code = 0, stdout = "1\told\0", stderr = "" })
@@ -935,7 +1011,7 @@ test("large skim output yields so a new query can invalidate decoding", function
     end)
     drain()
     eq(#jobs, 2)
-    assert(p.matching and p:current() == nil)
+    assert(p.matching and p:current() == "item1")
     jobs[2].callback({ code = 1, stdout = "", stderr = "" })
     drain()
     assert(not p.matching and #p.matches == 0)

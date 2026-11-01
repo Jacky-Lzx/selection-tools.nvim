@@ -48,6 +48,9 @@ timer:start(
       assert(ticks < 2000, "skim terminal test timed out at " .. stage)
       if picker and picker.matching then
         heartbeat = heartbeat + 1
+        assert(#picker.matches > 0, "visible results were cleared while matching")
+        local lines = vim.api.nvim_buf_get_lines(picker.list_buf, 0, -1, false)
+        assert(#lines > 0 and not vim.tbl_contains(lines, "Matching…"), "matching placeholder replaced the list")
       end
       if stage == "startup" and (not configured or vim.g.did_very_lazy) then
         picker = tools.open({

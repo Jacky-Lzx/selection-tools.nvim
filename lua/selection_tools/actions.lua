@@ -2,7 +2,7 @@ local M = {}
 
 -- Prefer explicit marks; otherwise export the complete filtered result set.
 function M.export(picker, location, all)
-  if picker.closed or picker.matching then
+  if picker.closed or picker.matching or picker.finder_pending then
     return
   end
   local items = not all and picker:selected() or {}
@@ -46,7 +46,7 @@ function M.export(picker, location, all)
 end
 
 function M.edit(picker, mode)
-  if picker.closed or picker.matching then
+  if picker.closed or picker.matching or picker.finder_pending then
     return
   end
   local commands = { split = "split", vsplit = "vsplit", tab = "tabnew" }

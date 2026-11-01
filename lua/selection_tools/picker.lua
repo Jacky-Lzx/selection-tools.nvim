@@ -54,7 +54,7 @@ function Picker:_draw_frame()
   end
   self:_draw_separators()
   local marked = vim.tbl_count(self.marks)
-  local status = self.error and "Error" or (self.loading and "Loading" or (self.matching and "Matching" or nil))
+  local status = self.error and "Error" or nil
   local current = self.matches[self.index] and self.index or 0
   local count = (" %d/%d%s%s "):format(
     current,
@@ -165,11 +165,10 @@ function Picker:_filter()
   if self.closed then
     return
   end
-  self.positions = {}
-  self.index, self.offset = 1, 0
   if self.query == "" or self.opts.match == false or #self.entries == 0 then
     self.matcher:cancel()
     self.matching, self.match_backend = false, "none"
+    self.positions, self.index, self.offset = {}, 1, 0
     self.matches = self.entries
     self:_render()
     return
@@ -177,8 +176,8 @@ function Picker:_filter()
   local backend = self.matcher:select(self.query)
   self.matching, self.match_backend = backend == "skim", backend
   if self.matching then
-    self.matches = {}
-    self:_render()
+    -- Keep the displayed rows, selection and preview until matching completes.
+    self:_draw_frame()
   end
   self.matcher:run(self.query, backend, function(matches, positions, used)
     if self.closed then
@@ -359,7 +358,7 @@ function Picker:_render()
   end
   if count == 0 then
     lines[1] = self.error and ("Error: " .. single_line(self.error))
-      or (self.loading and "Loading…" or (self.matching and "Matching…" or "No results"))
+      or ((self.loading or self.matching) and "" or "No results")
   end
   self.rendering = true
   vim.bo[self.list_buf].modifiable = true
@@ -465,7 +464,15 @@ function Picker:_find()
   self:_cancel_finder()
   local generation = self.generation
   self.loading, self.error, self.truncated = true, nil, nil
-  self:_set_items({})
+  self.finder_pending = true
+  self.matcher:cancel()
+  self.matching = false
+  -- The previous generation remains visible until the first replacement batch.
+  if #self.matches == 0 then
+    self:_render()
+  else
+    self:_draw_frame()
+  end
   local function current()
     return not self.closed and self.generation == generation
   end
@@ -481,6 +488,10 @@ function Picker:_find()
   ctx.set_items = function(items)
     vim.schedule(function()
       if current() then
+        if self.finder_pending and type(items) == "table" and #items == 0 then
+          return
+        end
+        self.finder_pending = false
         local ok, err = pcall(self._set_items, self, items)
         if not ok then
           ctx.fail(err)
@@ -494,6 +505,15 @@ function Picker:_find()
         return
       end
       local ok, err = pcall(function()
+        assert(type(items) == "table", "finder results must be a list")
+        if #items == 0 then
+          return
+        end
+        if self.finder_pending then
+          self.finder_pending = false
+          self:_set_items(items)
+          return
+        end
         for _, item in ipairs(items) do
           local raw = tostring(self.opts.format_item and self.opts.format_item(item) or item)
           local display = single_line(raw)
@@ -522,6 +542,10 @@ function Picker:_find()
       if current() then
         self.loading = false
         self.truncated = status and status.truncated
+        if self.finder_pending then
+          self.finder_pending = false
+          self:_set_items({})
+        end
         self:_apply_restore()
         self:_render()
       end
@@ -531,6 +555,10 @@ function Picker:_find()
     vim.schedule(function()
       if current() then
         self.loading, self.error = false, tostring(err)
+        if self.finder_pending then
+          self.finder_pending = false
+          self:_set_items({})
+        end
         self:_render()
         notify(err)
       end
@@ -719,7 +747,7 @@ function Picker:restore(saved)
 end
 
 function Picker:confirm()
-  if self.closed or self.matching or self.confirmation then
+  if self.closed or self.matching or self.finder_pending or self.confirmation then
     return
   end
   local item, index = self:current()
@@ -734,6 +762,7 @@ function Picker:confirm()
     return self.closed
       or self.confirmation ~= ctx
       or self.matching
+      or self.finder_pending
       or current ~= item
       or current_index ~= index
       or self.query ~= query

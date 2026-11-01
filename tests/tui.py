@@ -44,6 +44,8 @@ def run_case(case):
             actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
         if case == "grep_tui":
             actions.update(type=b"hel")
+        if case == "live_tui":
+            actions.update(type=b"a", type_again=b"b", type_last=b"c", type_empty=b"x")
         if case == "match_tui":
             actions.update(type=b"png")
         if case == "item_icons_tui":
@@ -97,6 +99,7 @@ if __name__ == "__main__":
     run_case("item_icons_tui")
     run_case("match_tui")
     run_case("grep_tui")
+    run_case("live_tui")
     run_case("grep_columns_tui")
     run_case("workflows_tui")
     run_case("syntax_tui")

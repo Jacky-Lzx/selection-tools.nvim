@@ -118,7 +118,7 @@ closure and input buffer destruction also clean up the picker.
 The current-position/result-count indicator appears at the right of the input
 row, with space reserved even when the query scrolls horizontally. The position
 is 1-based within the filtered results; no matches displays 0/0. Loading and
-matching states are appended after the numeric indicator. Internal dividers join the
+matching labels are hidden. Internal dividers join the
 outer border and do not display preview filenames. Previews use absolute line
 numbers.
 
@@ -148,6 +148,10 @@ limit=10000, max_output=32 MiB and max_line_bytes=1 MiB bound work/output.
 Reaching a bound stops the process, shows "Limit reached", and sets
 picker.truncated to the reason. The result limit is not a total-match count.
 New queries/option changes/close cancel producers and discard late chunks.
+While waiting for the first replacement batch, the current list and preview
+remain visible; confirmation, split opening and result exports are paused.
+The first search leaves the list blank until results arrive. "No results" is
+shown only when the search completes without results, with no loading label.
 It defaults to literal smart-case search; regex=true enables regex patterns.
 Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
 Grep defaults to result_layout="grep": code is left-aligned and file locations
@@ -395,8 +399,9 @@ or backslashes, NUL, or more than 1024 characters use native matching even in
 skim mode. This avoids interpreting literal input as skim's extended search.
 Empty queries/lists and match=false bypass the matcher entirely (backend=none).
 
-While async matching is pending, old results are cleared, confirmation is a
-no-op, and the list displays Matching…. Existing marks are retained. Missing
+While async matching is pending, the current list, selected position and preview
+remain visible, and confirmation is a no-op. No matching label is displayed.
+Existing marks are retained. Missing
 executables silently use native matching. A process failure, timeout or invalid
 result warns once and falls back to native for the rest of that picker. The
 matcher clears SKIM_DEFAULT_OPTIONS for its subprocess. matcher_status reports

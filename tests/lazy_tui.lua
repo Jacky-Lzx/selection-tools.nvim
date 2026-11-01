@@ -40,7 +40,7 @@ local screen = {}
 for c = col + 1, col + 30 do
   screen[#screen + 1] = vim.fn.screenstring(row + 1, c)
 end
-assert(table.concat(screen):find("Loading", 1, true), "Loading frame was not drawn before I/O")
+assert(table.concat(screen):match("^%s*$"), "Initial search should leave the list blank before I/O")
 local timer = assert(vim.uv.new_timer())
 local stage, ticks, heartbeats, cached_reads, finished = "loading", 0, 0, nil, false
 local function mark(value)
