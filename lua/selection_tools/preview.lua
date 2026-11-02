@@ -61,6 +61,11 @@ function Preview:_release_buffer(keep, borrowed)
   local buf = self.owned_buf
   self.owned_buf = keep
   if buf and buf ~= self.buf and buf ~= keep and buf ~= borrowed and api.nvim_buf_is_valid(buf) then
+    local win = self.picker.preview_win
+    if win and api.nvim_win_is_valid(win) and api.nvim_win_get_buf(win) == buf and api.nvim_buf_is_valid(self.buf) then
+      -- Deleting a displayed buffer closes its float and cancels the picker.
+      api.nvim_win_set_buf(win, self.buf)
+    end
     pcall(api.nvim_buf_delete, buf, { force = true })
   end
 end

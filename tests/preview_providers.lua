@@ -290,6 +290,53 @@ test("retained provider frames remain until the next guarded paint or cancellati
   p:close()
   eq(closed, 1)
 end)
+test("zero matches release owned terminal frames without closing the picker", function()
+  local frames, contexts, choices = {}, {}, 0
+  local p = tools.open({
+    items = { "Change text" },
+    preview = { enabled = true },
+    previewer = function(ctx)
+      contexts[#contexts + 1] = ctx
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].bufhidden = "hide"
+      frames[#frames + 1] = buf
+      assert(ctx.set_buffer(buf, { owned = true }))
+      vim.api.nvim_chan_send(vim.api.nvim_open_term(buf, {}), "terminal preview")
+    end,
+    on_choice = function()
+      choices = choices + 1
+    end,
+  })
+  local win = p.preview_win
+  for _, query in ipairs({ "1", "zzz" }) do
+    local frame, ctx = frames[#frames], contexts[#contexts]
+    eq(vim.api.nvim_win_get_buf(win), frame)
+    eq(vim.bo[frame].buftype, "terminal")
+    p:set_query(query)
+    ready(p)
+    vim.wait(20, function()
+      return false
+    end, 1)
+    assert(not p.closed and vim.api.nvim_win_is_valid(win), "zero matches closed the preview pane")
+    eq(#p.matches, 0)
+    eq(vim.api.nvim_win_get_buf(win), p.preview_buf)
+    eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, -1, false), { "No preview" })
+    assert(not vim.api.nvim_buf_is_valid(frame), "old terminal frame leaked")
+    eq(choices, 0)
+    local stale = vim.api.nvim_create_buf(false, true)
+    assert(not ctx.set_buffer(stale, { owned = true }))
+    assert(not vim.api.nvim_buf_is_valid(stale), "cancelled frame leaked")
+    p:set_query("")
+    ready(p)
+    assert(not p.closed and p:current() == "Change text")
+    assert(vim.api.nvim_buf_is_valid(frames[#frames]))
+  end
+  p:close()
+  eq(choices, 1)
+  for _, frame in ipairs(frames) do
+    assert(not vim.api.nvim_buf_is_valid(frame), "closing leaked a terminal frame")
+  end
+end)
 vim.fn.delete(fixture, "rf")
 print(("%d preview provider tests passed, %d failed"):format(passed, failed))
 vim.cmd(failed > 0 and "cquit 1" or "qa!")
