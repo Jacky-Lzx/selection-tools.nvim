@@ -256,6 +256,11 @@ selection.open(opts)
       prompt         Window title; default 'Select'.
       query          Initial query; default ''.
       on_choice      Optional fun(item, original_index); nils on cancellation.
+      on_change      Optional fun(item, original_index, picker). Runs for the
+                     initial displayed selection and when its item/index
+                     changes, including nils for no matches. Same-selection
+                     redraws/resizes do not repeat it. Pending async results
+                     retain the previous selection; errors are reported.
       on_close       Optional fun(picker), after cleanup, before on_choice.
       resume         false excludes this picker from resume; default true.
       resume_refresh Recreate this source on resume; default false.

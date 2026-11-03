@@ -282,6 +282,14 @@ require("selection_tools").select(actions, {
 end)
 ```
 
+Use `on_change(item, original_index, picker)` for live selection feedback, even
+without a preview pane. It runs for the initial displayed selection and whenever
+the displayed item or its original index changes; no matches supplies `nil, nil`.
+Redraws/resizes of the same selection do not repeat it. Pending asynchronous
+results retain the last displayed selection. Callback errors are reported while
+the picker stays usable. Pair this with `before_confirm` and `on_close` for
+transactional previews; set `resume = false` for callbacks tied to one session.
+
 Filtering preserves the original Lua object and its index in the original list. Cancellation calls the callback with `nil, nil`. Each picker calls its callback once, after cleaning up windows and restoring the original focus. Opening a new picker cancels the existing one. Enable multiple selection in `open()` with `multi = true`; the confirmation callback's third argument is the list of marked items (or the current item if none are marked), while the first two remain the current item and its index.
 
 Marking the first item reveals a selection column on the left: `○ │ item` is unmarked, and `● │ item` is marked. The column stays visible when filtering hides marked items and collapses after all marks are cleared.
@@ -361,6 +369,7 @@ nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
+nvim --headless -u NONE -n -i NONE -l tests/on_change.lua
 nvim --headless -u NONE -n -i NONE -l tests/undo_tree.lua
 # Optional: sibling git-tools.nvim (or GIT_TOOLS_DIR) and delta
 nvim --headless -u NONE -n -i NONE -l tests/undo.lua

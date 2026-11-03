@@ -500,6 +500,19 @@ function Picker:_render()
     self.preview:update(self:current())
     self:_restore_preview()
   end
+  if self.opts.on_change and not self.matching and not self.finder_pending then
+    local item, index = self:current()
+    if not self.change_notified or item ~= self.change_item or index ~= self.change_index then
+      self.change_notified, self.change_item, self.change_index = true, item, index
+      local ok, err = pcall(self.opts.on_change, item, index, self)
+      if not ok then
+        notify(err)
+      end
+      if not self.closed then
+        self:_setup_highlights()
+      end
+    end
+  end
 end
 
 function Picker:_cancel_finder()
@@ -801,6 +814,11 @@ function Picker:restore(saved)
 end
 
 function Picker:confirm()
+  -- A terminal can deliver text and Enter in one batch, before the scheduled
+  -- on_lines callback updates the query. Confirm against the visible input.
+  if not self.closed and api.nvim_buf_is_valid(self.input_buf) then
+    self:set_query(table.concat(api.nvim_buf_get_lines(self.input_buf, 0, -1, false), " "))
+  end
   if self.closed or self.matching or self.finder_pending or self.syntax_pending or self.confirmation then
     return
   end
@@ -1021,6 +1039,12 @@ function Picker:_events()
       end)
     end,
   })
+  api.nvim_create_autocmd("ColorScheme", {
+    group = self.group,
+    callback = function()
+      self:_setup_highlights()
+    end,
+  })
   api.nvim_create_autocmd("VimResized", {
     group = self.group,
     callback = function()
@@ -1127,6 +1151,41 @@ function Picker:_events()
   end, { buffer = self.list_buf })
 end
 
+function Picker:_setup_highlights()
+  local function default_highlight(name, value)
+    -- An explicit empty definition (for example after palette rollback) also
+    -- needs defaults. nvim_set_hl(default=true) alone can skip cleared groups.
+    if vim.tbl_isempty(api.nvim_get_hl(0, { name = name, create = false })) then
+      api.nvim_set_hl(0, name, value)
+    end
+  end
+  default_highlight("SelectionToolsBorder", { link = "FloatBorder" })
+  default_highlight("SelectionToolsSelected", { link = "Visual" })
+  default_highlight("SelectionToolsMatch", { link = "Search" })
+  default_highlight("SelectionToolsMarked", { link = "Special" })
+  default_highlight("SelectionToolsUnmarked", { link = "Comment" })
+  default_highlight("SelectionToolsMarkSeparator", { link = "Comment" })
+  local count_hl = api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false, create = false })
+  if vim.tbl_isempty(count_hl) then
+    count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
+  end
+  count_hl.italic = false
+  if count_hl.cterm then
+    count_hl.cterm.italic = false
+  end
+  api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
+  default_highlight("SelectionToolsFileIcon", { link = "Comment" })
+  default_highlight("SelectionToolsDirectoryIcon", { link = "Directory" })
+  local file_color = api.nvim_get_hl(0, { name = "Comment", link = false })
+  default_highlight("SelectionToolsFileLocation", {
+    fg = file_color.fg,
+    ctermfg = file_color.ctermfg,
+    italic = false,
+  })
+  default_highlight("SelectionToolsPreviewLine", { link = "CursorLine" })
+  default_highlight("SelectionToolsPreviewMatch", { link = "Search" })
+end
+
 function Picker:_mount(resolved)
   self.frame_buf = scratch("selection_tools_frame")
   self.input_buf, self.list_buf = scratch("selection_tools_input"), scratch("selection_tools_list")
@@ -1159,43 +1218,26 @@ function Picker:_mount(resolved)
       end
     end
   end
-  api.nvim_set_hl(0, "SelectionToolsBorder", { default = true, link = "FloatBorder" })
-  api.nvim_set_hl(0, "SelectionToolsSelected", { default = true, link = "Visual" })
-  api.nvim_set_hl(0, "SelectionToolsMatch", { default = true, link = "Search" })
-  api.nvim_set_hl(0, "SelectionToolsMarked", { default = true, link = "Special" })
-  api.nvim_set_hl(0, "SelectionToolsUnmarked", { default = true, link = "Comment" })
-  api.nvim_set_hl(0, "SelectionToolsMarkSeparator", { default = true, link = "Comment" })
-  local count_hl = api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false, create = false })
-  if vim.tbl_isempty(count_hl) then
-    count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
-  end
-  count_hl.italic = false
-  if count_hl.cterm then
-    count_hl.cterm.italic = false
-  end
-  api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
-  api.nvim_set_hl(0, "SelectionToolsFileIcon", { default = true, link = "Comment" })
-  api.nvim_set_hl(0, "SelectionToolsDirectoryIcon", { default = true, link = "Directory" })
-  local file_color = api.nvim_get_hl(0, { name = "Comment", link = false })
-  api.nvim_set_hl(
-    0,
-    "SelectionToolsFileLocation",
-    { default = true, fg = file_color.fg, ctermfg = file_color.ctermfg, italic = false }
-  )
-  api.nvim_set_hl(0, "SelectionToolsPreviewLine", { default = true, link = "CursorLine" })
-  api.nvim_set_hl(0, "SelectionToolsPreviewMatch", { default = true, link = "Search" })
+  self:_setup_highlights()
   self:_events()
   active = self
   self.started = true
   self:_filter()
+  if self.closed then
+    return
+  end
   if self.opts.finder then
     self:_find()
+  end
+  if self.closed then
+    return
   end
   api.nvim_win_set_cursor(self.input_win, { 1, #self.query })
   vim.cmd.startinsert({ bang = true })
 end
 
 function Picker.new(opts)
+  assert(opts.on_change == nil or type(opts.on_change) == "function", "selection-tools: on_change must be a function")
   assert(
     opts.before_confirm == nil or type(opts.before_confirm) == "function",
     "selection-tools: before_confirm must be a function"
