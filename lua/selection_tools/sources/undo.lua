@@ -11,6 +11,7 @@ return function(opts)
   local name = vim.api.nvim_buf_get_name(origin.buf)
   local filename = name ~= "" and vim.fs.basename(name) or "[No Name]"
   local cwd = opts.cwd or (name ~= "" and vim.fs.dirname(name) or vim.fn.getcwd())
+  local delta = vim.tbl_extend("force", { args = { "--file-style=omit" } }, opts.delta or {})
   local history = require("selection_tools.sources.undo_tree").new(tree)
   local current = vim.api.nvim_buf_get_lines(origin.buf, 0, -1, false)
   local current_text = table.concat(current, "\n") .. (vim.bo[origin.buf].endofline and "\n" or "")
@@ -132,7 +133,7 @@ return function(opts)
       return diff.render(
         view,
         patch,
-        { backend = opts.backend or "delta", delta = opts.delta, cwd = cwd, title = title },
+        { backend = opts.backend or "delta", delta = delta, cwd = cwd, title = title },
         function()
           return vim.api.nvim_buf_is_valid(origin.buf) and vim.api.nvim_buf_get_changedtick(origin.buf) == origin.tick
         end
