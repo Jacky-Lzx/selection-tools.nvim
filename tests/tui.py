@@ -27,8 +27,12 @@ def run_case(case):
             SELECTION_TOOLS_TEST_DIR=directory,
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
+        configured = case in {"undo_tui", "delta_preview_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
+        if configured:
+            env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
+        init = [] if configured else ["-u", "NONE"]
         process = subprocess.Popen(
-            [shutil.which("nvim") or "nvim", "-u", "NONE", "-n", "-i", "NONE", "-c", "lua dofile('tests/" + case + ".lua')"],
+            [shutil.which("nvim") or "nvim", *init, "-n", "-i", "NONE", "-c", "lua dofile('tests/" + case + ".lua')"],
             cwd=root, env=env, stdin=slave, stdout=slave, stderr=slave,
         )
         os.close(slave)
@@ -54,6 +58,17 @@ def run_case(case):
             actions.update(type_again=b"bta", close_warm=b"\x1b")
         if case == "preview_tui":
             actions.update(move_again=b"\x0e")
+        if case == "undo_tui":
+            direction = b"\x10" if env.get("SELECTION_TOOLS_CONFIGURED") == "1" else b"\x0e"
+            clear = b"\x1bOH" + b"\x1b[3~" * len("no-such-undo-version")
+            replace_saved = b"\x1bOH" + b"\x1b[3~" * len("saved")
+            actions.update(open=b" su", reopen=b" su", filter=b"saved", zero=replace_saved + b"no-such-undo-version", clear=clear,
+                           move=direction, move_again=direction, move_final=direction,
+                           compare_current=b"\x1bOS", compare_parent=b"\x1bOS",
+                           resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
+        if case == "delta_preview_tui":
+            direction = b"\x10" if configured else b"\x0e"
+            actions.update(move=direction, move_again=direction, move_latest=direction, resize_narrow=b"")
         handled = set()
         output = bytearray()
         deadline = time.monotonic() + 15
@@ -68,7 +83,7 @@ def run_case(case):
                 stage_file = Path(directory, "stage")
                 stage = stage_file.read_text().strip() if stage_file.exists() else ""
                 if stage in actions and stage not in handled:
-                    if case == "grep_columns_tui" and stage.startswith("resize_"):
+                    if case in {"grep_columns_tui", "undo_tui", "delta_preview_tui"} and stage.startswith("resize_"):
                         columns = {"resize_narrow": 48, "resize_tiny": 16, "resize_wide": 120}[stage]
                         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 30, columns, 0, 0))
                         os.kill(process.pid, signal.SIGWINCH)
@@ -81,7 +96,7 @@ def run_case(case):
                     handled.add(stage)
             if process.poll() is None:
                 process.kill()
-                raise AssertionError("Terminal test timed out; stages: " + repr(handled))
+                raise AssertionError("Terminal test timed out; stages: " + repr(handled) + "\n" + output.decode(errors="replace")[-3000:])
             result_file = Path(directory, "result")
             result = result_file.read_text().strip() if result_file.exists() else "No terminal test result"
             assert process.returncode == 0 and result.startswith("PASS"), result + "\n" + output.decode(errors="replace")[-3000:]
@@ -108,6 +123,12 @@ if __name__ == "__main__":
     run_case("grep_columns_tui")
     run_case("workflows_tui")
     run_case("syntax_tui")
+    git_tools = os.environ.get("GIT_TOOLS_DIR", str(Path(__file__).resolve().parents[2] / "git-tools.nvim"))
+    if shutil.which("delta") and Path(git_tools, "lua/git_tools/diff/init.lua").exists():
+        run_case("undo_tui")
+        run_case("delta_preview_tui")
+    else:
+        print("SKIP undo delta terminal integration (install delta and set GIT_TOOLS_DIR)")
     if os.environ.get("IMAGE_TOOLS_ROOT"):
         run_case("image_tools_tui")
     else:

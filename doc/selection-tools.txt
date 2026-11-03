@@ -274,6 +274,8 @@ selection.open(opts)
       preview        { enabled=false, max_size=1048576, max_lines=10000,
                        max_line_length=1000, highlight_line=true,
                        highlight_matches=true }. Built-in sources enable it.
+                     title=true shows the preview title on its divider,
+                     clipped to the available display cells; undo enables it.
       preview_item   vim.ui.select-style function(item) returning a buffer
                      and optional pos. Caller buffers are displayed directly
                      without changing their options or deleting them.
@@ -460,6 +462,27 @@ picker gets a fresh index.
   undo             Native undo tree including branches. Diff preview uses a
                    clone and temporary undo file, removed on close. Confirm
                    changes the original buffer only if its text is unchanged.
+                   Compact graph shows actual ancestry and groups sibling
+                   branches, descendants before their shared ancestors.
+                   ● version, ◆ current version, saved last write.
+                   Adjacent forks bend from the parent's row to the child.
+                   Time uses the primary highlight; muted sequence numbers
+                   align at the right edge, including after resizing. Search
+                   retains dimmed ancestors labeled context; #42 matches an
+                   exact sequence. Title identifies the source file; preview
+                   divider shows Step #parent -> #selected by default, so
+                   each preview focuses on that undo block's own change.
+                   F4 (undo_compare) toggles parent/current comparison without
+                   moving the selection or clearing the query. compare='current'
+                   starts with the snapshot captured on open as the baseline;
+                   compare='parent' is the default. Resume preserves this mode.
+                   Initial states and pruned parents show full snapshots with
+                   an explanatory title. Distinct nodes with identical text
+                   can produce equal hunks in current comparison mode.
+                   Uses git-tools.nvim's delta renderer by default, with
+                   native diff fallback. backend='vim' forces native diff;
+                   delta={command='delta',args={},timeout=2000} customizes it.
+                   Without git-tools.nvim, previews full historical snapshots.
   search_history   Newest search patterns. Confirm restores / and searches the
                    invoking window using the native pattern semantics.
   command_history  Newest Ex commands. Confirm executes the selected command

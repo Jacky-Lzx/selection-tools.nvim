@@ -337,7 +337,8 @@ test("undo history previews a cloned tree and changes the original only on confi
   local original = vim.api.nvim_get_current_buf()
   local lines, tick = vim.api.nvim_buf_get_lines(0, 0, -1, false), vim.api.nvim_buf_get_changedtick(0)
   local current_seq = vim.fn.undotree().seq_cur
-  local p = tools.undo()
+  local p = tools.undo({ backend = "vim" })
+  ready(p)
   local seq
   for i, entry in ipairs(p.matches) do
     if entry.item.seq > 0 and entry.item.seq < current_seq then

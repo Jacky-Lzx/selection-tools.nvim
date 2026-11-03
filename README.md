@@ -361,6 +361,9 @@ nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
+nvim --headless -u NONE -n -i NONE -l tests/undo_tree.lua
+# Optional: sibling git-tools.nvim (or GIT_TOOLS_DIR) and delta
+nvim --headless -u NONE -n -i NONE -l tests/undo.lua
 # Optional: real image-tools API and media/cache integration; tests simulate Kitty responses
 IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py
@@ -386,7 +389,7 @@ Tests cover object/index preservation, cancellation and lifecycle, stale asynchr
 
 - `marks()`: combines local marks from the current buffer with global marks, displays and previews exact locations, and jumps on confirmation.
 
-- `undo()`: searches the native undo tree, including branches, and reads historical content in an isolated clone. Uses git-tools.nvim's diff API for previews when installed, otherwise displays the full historical snapshot. Only confirmation changes the original buffer; stale states are rejected if its content has changed. Temporary undo files and clones are cleaned up on close.
+- `undo({ backend = "delta", delta = { command = "delta", args = {}, timeout = 2000 } })`: browses a compact undo graph, grouping sibling branches with newer descendants before their shared ancestors. `●` marks a version, `◆` the current version, and connecting lines show actual ancestry. Adjacent forks leave the parent's row with a rounded bend toward the child. Time is the primary highlighted column; muted sequence numbers align at the right edge, including after resizing. `saved` marks the last write. Search keeps matching versions and their dimmed ancestors (`context`); `#42` selects an exact sequence. The default preview compares the real parent → selected version, showing that undo block's own change. **F4** toggles comparison with the current snapshot captured on open; `compare = "current"` selects that mode initially (`"parent"` is the default). The divider identifies the baseline, and switching preserves the query and selection. Resume preserves the mode. Initial states and pruned parents show snapshots with an explanatory title. Historical content is read in an isolated clone, using git-tools.nvim's diff generation and delta rendering. Missing/failed delta falls back to native diff; `backend = "vim"` forces it. Without git-tools.nvim, previews full snapshots. Only confirmation changes the original buffer; stale content is rejected. Closing cleans up temporary undo files, clones, processes, and preview buffers.
 
 - `search_history()`: restores the search register and runs the selected search in the original window.
 

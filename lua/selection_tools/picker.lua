@@ -97,17 +97,39 @@ function Picker:_draw_separators()
   local joints = { ["│"] = { "├", "┤" }, ["║"] = { "╠", "╣" }, ["┃"] = { "┣", "┫" } }
   local horizontal = (left == "║" or right == "║") and "═"
     or ((left == "┃" or right == "┃") and "━" or "─")
-  local line = (joints[left] and joints[left][1] or left)
-    .. string.rep(horizontal, self.resolved.width)
-    .. (joints[right] and joints[right][2] or right)
   if not self.separator_buf or not api.nvim_buf_is_valid(self.separator_buf) then
     self.separator_buf = scratch("selection_tools_separator")
     self.separator_wins = {}
   end
   vim.bo[self.separator_buf].modifiable = true
-  api.nvim_buf_set_lines(self.separator_buf, 0, -1, false, { line })
+  local lines = {}
+  local preview_row = self.opts.layout.input_position == "bottom" and self.resolved.separators[1]
+    or self.resolved.separators[#self.resolved.separators]
+  for i, row in ipairs(self.resolved.separators) do
+    local body = string.rep(horizontal, self.resolved.width)
+    if self.preview_win and self.opts.preview.title and self.preview_title and row == preview_row then
+      local title = single_line(self.preview_title)
+      local cells = math.max(0, self.resolved.width - 4)
+      if vim.fn.strdisplaywidth(title) > cells then
+        local count = vim.fn.strchars(title, true)
+        repeat
+          count = count - 1
+          title = vim.fn.strcharpart(title, 0, count, true)
+        until vim.fn.strdisplaywidth(title .. "…") <= cells or count == 0
+        title = cells > 0 and (title .. "…") or ""
+      end
+      local label = " " .. title .. " "
+      body = horizontal .. label .. string.rep(horizontal, self.resolved.width - 1 - vim.fn.strdisplaywidth(label))
+    end
+    lines[self.opts.preview.title and i or 1] = (joints[left] and joints[left][1] or left)
+      .. body
+      .. (joints[right] and joints[right][2] or right)
+  end
+  api.nvim_buf_set_lines(self.separator_buf, 0, -1, false, lines)
   vim.bo[self.separator_buf].modifiable = false
-  api.nvim_buf_set_extmark(self.separator_buf, ns, 0, 0, { id = 1, line_hl_group = "SelectionToolsBorder" })
+  for i in ipairs(lines) do
+    api.nvim_buf_set_extmark(self.separator_buf, ns, i - 1, 0, { id = i, line_hl_group = "SelectionToolsBorder" })
+  end
   for i, row in ipairs(self.resolved.separators) do
     local config = {
       relative = "editor",
@@ -115,7 +137,7 @@ function Picker:_draw_separators()
       border = "none",
       row = self.resolved.frame.row + row + (char(2) ~= "" and 1 or 0),
       col = self.resolved.frame.col,
-      width = vim.fn.strdisplaywidth(line),
+      width = vim.fn.strdisplaywidth(lines[i] or lines[1]),
       height = 1,
       zindex = 62,
       focusable = false,
@@ -128,6 +150,9 @@ function Picker:_draw_separators()
       self.separator_wins[i] = win
       vim.wo[win].wrap = false
       vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
+    end
+    if self.opts.preview.title then
+      api.nvim_win_set_cursor(win, { i, 0 })
     end
   end
   for i = #self.separator_wins, #self.resolved.separators + 1, -1 do
@@ -317,6 +342,7 @@ function Picker:_render()
   local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
   local icons, icon_width, rows = {}, 0, {}
   local columns = self.opts.result_layout == "grep" and require("selection_tools.grep_row") or nil
+  local undo = self.opts.result_layout == "undo" and require("selection_tools.undo_row") or nil
   local wanted_file, wanted_position = 0, 0
   if reverse and count > 0 then
     for row = 1, self.height do
@@ -365,6 +391,8 @@ function Picker:_render()
       end
       rows[row] =
         columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width, wanted_position)
+    elseif undo then
+      rows[row] = undo.render(entry, self.resolved.width, prefix, reverse)
     else
       if icon_width > 0 and not show_marks then
         prefix = " "
