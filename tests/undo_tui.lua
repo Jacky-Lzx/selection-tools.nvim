@@ -34,7 +34,7 @@ local lines, tick = api.nvim_buf_get_lines(source, 0, -1, false), api.nvim_buf_g
 local p
 local undo = tools.undo
 tools.undo = function(opts)
-  p = undo(opts)
+  p = undo(vim.tbl_extend("force", {}, opts or {}, { backend = "delta" }))
   return p
 end
 local stage, ticks, finished, frame = "open", 0, false, nil

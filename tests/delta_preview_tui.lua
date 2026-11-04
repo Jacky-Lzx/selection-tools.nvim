@@ -42,7 +42,7 @@ api.nvim_win_set_buf = function(win, buf)
   end
   return set_buffer(win, buf)
 end
-p = tools.undo({ compare = "current" })
+p = tools.undo({ compare = "current", backend = "delta" })
 local stage, ticks, pending, prior = "start", 0, 0, nil
 local timer = assert(vim.uv.new_timer())
 local function mark(value)

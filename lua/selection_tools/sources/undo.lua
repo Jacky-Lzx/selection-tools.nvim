@@ -127,13 +127,27 @@ return function(opts)
       end
       local view = vim.tbl_extend("force", {}, ctx, {
         set_buffer = function(buf, metadata)
-          return ctx.set_buffer(buf, vim.tbl_extend("force", {}, metadata or {}, { title = title .. " · delta" }))
+          return ctx.set_buffer(
+            buf,
+            vim.tbl_extend(
+              "force",
+              {},
+              metadata or {},
+              { title = title .. " · " .. (metadata.backend == "delta" and "delta" or "diff") }
+            )
+          )
         end,
       })
       return diff.render(
         view,
         patch,
-        { backend = opts.backend or "delta", delta = delta, cwd = cwd, title = title },
+        {
+          backend = opts.backend or "native",
+          native = vim.tbl_extend("force", { file_header = false }, opts.native or {}),
+          delta = delta,
+          cwd = cwd,
+          title = title,
+        },
         function()
           return vim.api.nvim_buf_is_valid(origin.buf) and vim.api.nvim_buf_get_changedtick(origin.buf) == origin.tick
         end

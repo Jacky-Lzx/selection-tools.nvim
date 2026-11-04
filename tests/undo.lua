@@ -121,7 +121,7 @@ local ok, err = xpcall(function()
   )
 
   assert(vim.fn.executable("delta") == 1, "Install delta to run renderer integration")
-  p = open()
+  p = open({ backend = "delta" })
   select(p, abandoned)
   wait(function()
     return vim.bo[preview(p)].buftype == "terminal" and patch(p):find("旧分支", 1, true)
@@ -135,11 +135,16 @@ local ok, err = xpcall(function()
   assert(not api.nvim_buf_is_valid(frame), "Owned delta buffer leaked on close")
   print("PASS undo: real delta API rendering, provider lifecycle, frame cleanup, original undo position preserved")
 
-  for _, opts in ipairs({ { backend = "vim" }, { delta = { command = "selection-tools-missing-delta" } } }) do
+  for _, opts in ipairs({
+    { backend = "vim" },
+    {},
+    { backend = "delta", delta = { command = "selection-tools-missing-delta" } },
+  }) do
     p = open(opts)
     select(p, abandoned)
     wait(function()
-      return vim.bo[preview(p)].filetype == "diff" and patch(p):find("旧分支", 1, true)
+      return vim.bo[preview(p)].filetype == (opts.backend == "vim" and "diff" or "git-tools-diff")
+        and patch(p):find("旧分支", 1, true)
     end)
     unchanged()
     p:close()
