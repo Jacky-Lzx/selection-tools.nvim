@@ -43,17 +43,12 @@ function M.label(opts)
   if opts.source == "grep" then
     flags = { opts.regex and "regex" or "literal", opts.case or "smart" }
   end
-  if opts.hidden then
-    flags[#flags + 1] = "hidden"
-  end
-  if opts.ignored then
-    flags[#flags + 1] = "no-ignore"
-  end
+  flags[#flags + 1] = opts.hidden and "hidden:on" or "hidden:off"
+  flags[#flags + 1] = opts.ignored and "ignore:off" or "ignore:on"
   for _, glob in ipairs(opts.globs or {}) do
     flags[#flags + 1] = glob
   end
-  flags[#flags + 1] = vim.fn.fnamemodify(opts.cwd, ":~")
-  return " [" .. table.concat(flags, " · ") .. "]"
+  return table.concat(flags, " · ")
 end
 
 function M.action(picker, name)

@@ -114,7 +114,7 @@ require("selection_tools").grep({
 
 ## Search scope and modes
 
-In file and grep pickers, `<A-h>` toggles hidden files, `<A-i>` toggles ignored files, `<A-f>` sets the search directory, and `<A-g>` sets file globs (comma separated, with `!` for exclusions, such as `*.rs,!vendor/**`). Grep also supports `<A-r>` to toggle regex/literal mode and `<A-c>` to cycle through smart/sensitive/ignore case policies. The title shows the current settings. Changes preserve the query, cancel old work, and restart the search; `resume()` retains these options. File glob filtering requires ripgrep.
+In file and grep pickers, `<A-h>` toggles hidden files, `<A-i>` toggles ignored files, `<A-f>` sets the search directory, and `<A-g>` sets file globs (comma separated, with `!` for exclusions, such as `*.rs,!vendor/**`). Grep also supports `<A-r>` to toggle regex/literal mode and `<A-c>` to cycle through smart/sensitive/ignore case policies. The top border shows the picker name, the preview/list divider shows the search directory, and the input/list divider shows the current filters (including `hidden:on/off` and `ignore:on/off`). Grep also shows its matching and case modes. Labels update when options change and follow `layout.title_pos`. Without a preview pane, the directory and filters share the input divider. Other pickers with `cwd` use the same directory divider; explicit preview titles retain their own divider. Changes preserve the query, cancel old work, and restart the search; `resume()` retains these options. File glob filtering requires ripgrep.
 
 You can also call `picker:set_search_options({ cwd = "/project/src", globs = { "*.rs" }, case = "sensitive", regex = true })` or pass these options to `files()` / `grep()`.
 
@@ -366,6 +366,7 @@ nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
+nvim --headless -u NONE -n -i NONE -l tests/borders.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua

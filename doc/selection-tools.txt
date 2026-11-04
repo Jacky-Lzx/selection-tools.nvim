@@ -172,7 +172,12 @@ without changing source code, preview ranges or exported values; display_indent
 preserves its leading whitespace. The formatted label must end with that content.
 Search controls (files/grep): ALT-H hidden, ALT-I ignored, ALT-F directory,
 ALT-G comma-separated file globs (! excludes). Grep also supports ALT-R regex
-and ALT-C case (smart/sensitive/ignore). Flags appear in the title. Changes
+and ALT-C case (smart/sensitive/ignore). The top border shows the picker name.
+The preview/list divider shows cwd; the input/list divider shows filters,
+including hidden:on/off and ignore:on/off plus grep's matching/case modes.
+Labels follow layout.title_pos. Without preview, cwd and filters share the
+input divider. Other pickers with cwd share the directory divider; explicit
+preview titles keep their own divider. Changes
 cancel/restart the finder without changing the input and are retained by resume.
 File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
 globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).

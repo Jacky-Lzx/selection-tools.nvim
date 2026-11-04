@@ -34,11 +34,6 @@ function Picker:_draw_frame()
   if not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
     return
   end
-  if self.opts.search_options then
-    local title = single_line(self.opts.prompt or "Select")
-      .. require("selection_tools.search_options").label(self.opts)
-    api.nvim_win_set_config(self.frame_win, { title = " " .. single_line(title) .. " " })
-  end
   local lines = {}
   for i = 1, self.resolved.total_height do
     lines[i] = ""
@@ -105,10 +100,28 @@ function Picker:_draw_separators()
   local lines = {}
   local preview_row = self.opts.layout.input_position == "bottom" and self.resolved.separators[1]
     or self.resolved.separators[#self.resolved.separators]
+  local input_row = self.opts.layout.input_position == "bottom" and self.resolved.separators[#self.resolved.separators]
+    or self.resolved.separators[1]
+  local path = self.opts.cwd and vim.fn.fnamemodify(self.opts.cwd, ":~")
+  local filters = self.opts.search_options and require("selection_tools.search_options").label(self.opts)
   for i, row in ipairs(self.resolved.separators) do
+    local title, position
+    if self.preview_win and row == preview_row then
+      if self.opts.preview.title and self.preview_title then
+        title, position = self.preview_title, "left"
+      else
+        title, position = path, self.opts.layout.title_pos
+      end
+    end
+    if row == input_row then
+      title, position = filters, self.opts.layout.title_pos
+      if not self.preview_win and path then
+        title = path .. (filters and (" · " .. filters) or "")
+      end
+    end
     local body = string.rep(horizontal, self.resolved.width)
-    if self.preview_win and self.opts.preview.title and self.preview_title and row == preview_row then
-      local title = single_line(self.preview_title)
+    if title then
+      title = single_line(title)
       local cells = math.max(0, self.resolved.width - 4)
       if vim.fn.strdisplaywidth(title) > cells then
         local count = vim.fn.strchars(title, true)
@@ -119,11 +132,12 @@ function Picker:_draw_separators()
         title = cells > 0 and (title .. "…") or ""
       end
       local label = " " .. title .. " "
-      body = horizontal .. label .. string.rep(horizontal, self.resolved.width - 1 - vim.fn.strdisplaywidth(label))
+      local available = self.resolved.width - vim.fn.strdisplaywidth(label)
+      local before = position == "center" and math.floor(available / 2)
+        or (position == "right" and (available - 1) or 1)
+      body = string.rep(horizontal, before) .. label .. string.rep(horizontal, available - before)
     end
-    lines[self.opts.preview.title and i or 1] = (joints[left] and joints[left][1] or left)
-      .. body
-      .. (joints[right] and joints[right][2] or right)
+    lines[i] = (joints[left] and joints[left][1] or left) .. body .. (joints[right] and joints[right][2] or right)
   end
   api.nvim_buf_set_lines(self.separator_buf, 0, -1, false, lines)
   vim.bo[self.separator_buf].modifiable = false
@@ -137,7 +151,7 @@ function Picker:_draw_separators()
       border = "none",
       row = self.resolved.frame.row + row + (char(2) ~= "" and 1 or 0),
       col = self.resolved.frame.col,
-      width = vim.fn.strdisplaywidth(lines[i] or lines[1]),
+      width = vim.fn.strdisplaywidth(lines[i]),
       height = 1,
       zindex = 62,
       focusable = false,
@@ -151,9 +165,7 @@ function Picker:_draw_separators()
       vim.wo[win].wrap = false
       vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
     end
-    if self.opts.preview.title then
-      api.nvim_win_set_cursor(win, { i, 0 })
-    end
+    api.nvim_win_set_cursor(win, { i, 0 })
   end
   for i = #self.separator_wins, #self.resolved.separators + 1, -1 do
     local win = table.remove(self.separator_wins, i)

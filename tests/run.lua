@@ -488,10 +488,10 @@ test("counts track the current result and dividers join the frame without previe
     eq(count(), " 1/2 ")
     eq(vim.api.nvim_win_get_config(p.frame_win).footer, nil)
     eq(vim.api.nvim_win_get_width(p.input_win) + vim.fn.strdisplaywidth(count()), p.resolved.width)
-    eq(
-      vim.api.nvim_buf_get_lines(p.separator_buf, 0, -1, false),
-      { "├" .. string.rep("─", p.resolved.width) .. "┤" }
-    )
+    eq(vim.api.nvim_buf_get_lines(p.separator_buf, 0, -1, false), {
+      "├" .. string.rep("─", p.resolved.width) .. "┤",
+      "├" .. string.rep("─", p.resolved.width) .. "┤",
+    })
     for i, win in ipairs(p.separator_wins) do
       local config = vim.api.nvim_win_get_config(win)
       eq(config.row, p.resolved.frame.row + p.resolved.separators[i] + 1)

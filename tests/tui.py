@@ -27,7 +27,7 @@ def run_case(case):
             SELECTION_TOOLS_TEST_DIR=directory,
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
-        configured = case in {"undo_tui", "delta_preview_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
+        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
         if configured:
             env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
         init = [] if configured else ["-u", "NONE"]
@@ -42,7 +42,7 @@ def run_case(case):
         if case == "image_tools_tui":
             actions.update(expand=b"\x1bOR", type_text=b"text", clear_text=b"\x15", move_again=b"\x0e", pdf=b"\x0e")
         if case == "workflows_tui":
-            actions.update(regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
+            actions.update(hidden=b"\x1bh", ignored=b"\x1bi", open_files=b" sf", regex=b"\x1br", literal=b"\x1br", scope=b"\x1bf",
                            scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11", expand=b"\x1bOR", collapse=b"\x1bOR", details=b"\x1bOQ", details_close=b"q", split=b"\x16")
         if case == "grep_columns_tui":
             actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
