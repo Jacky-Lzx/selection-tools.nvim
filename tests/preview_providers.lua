@@ -189,6 +189,7 @@ test("image-tools adapter stays lazy and delegates only supported image candidat
     eq(requests[1].buf, p.preview_buf)
     eq(requests[1].win, p.preview_win)
     eq(vim.api.nvim_buf_get_lines(p.preview_buf, 0, 1, false)[1], "native grid")
+    eq(p.preview.scrollable, false)
     p:expand_preview()
     eq(resized, 1)
     p:move(1)

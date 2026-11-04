@@ -27,7 +27,7 @@ def run_case(case):
             SELECTION_TOOLS_TEST_DIR=directory,
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
-        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui", "labels_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
+        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui", "labels_tui", "preview_scroll_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
         if configured:
             env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
         init = [] if configured else ["-u", "NONE"]
@@ -60,6 +60,11 @@ def run_case(case):
             actions.update(type_again=b"bta", close_warm=b"\x1b")
         if case == "preview_tui":
             actions.update(move_again=b"\x0e")
+        if case == "preview_scroll_tui":
+            direction = b"\x10" if configured else b"\x0e"
+            actions.update(scroll_down=b"\x04", scroll_bottom=b"\x04" * 30, scroll_up=b"\x15",
+                           expand=b"\x1bOR", collapse=b"\x1bOR", resize_narrow=b"", resize_wide=b"",
+                           native_top=b"\x07", short=direction, delta=direction, delta_scroll=b"\x04")
         if case == "undo_tui":
             direction = b"\x10" if env.get("SELECTION_TOOLS_CONFIGURED") == "1" else b"\x0e"
             clear = b"\x1bOH" + b"\x1b[3~" * len("no-such-undo-version")
@@ -85,7 +90,7 @@ def run_case(case):
                 stage_file = Path(directory, "stage")
                 stage = stage_file.read_text().strip() if stage_file.exists() else ""
                 if stage in actions and stage not in handled:
-                    if case in {"grep_columns_tui", "undo_tui", "delta_preview_tui"} and stage.startswith("resize_"):
+                    if case in {"grep_columns_tui", "undo_tui", "delta_preview_tui", "preview_scroll_tui"} and stage.startswith("resize_"):
                         columns = {"resize_narrow": 48, "resize_tiny": 16, "resize_wide": 120}[stage]
                         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 30, columns, 0, 0))
                         os.kill(process.pid, signal.SIGWINCH)
@@ -95,6 +100,10 @@ def run_case(case):
                 elif case == "mouse_tui" and stage.startswith("click_") and stage not in handled:
                     col, row = map(int, Path(directory, "mouse").read_text().split())
                     os.write(master, (f"\x1b[<0;{col};{row}M\x1b[<0;{col};{row}m").encode())
+                    handled.add(stage)
+                elif case == "preview_scroll_tui" and stage == "scroll_mouse" and stage not in handled:
+                    col, row = map(int, Path(directory, "mouse").read_text().split())
+                    os.write(master, (f"\x1b[<65;{col};{row}M").encode())
                     handled.add(stage)
             if process.poll() is None:
                 process.kill()
@@ -117,6 +126,7 @@ if __name__ == "__main__":
     run_case("tui")
     run_case("mouse_tui")
     run_case("preview_tui")
+    run_case("preview_scroll_tui")
     run_case("lazy_tui")
     run_case("item_icons_tui")
     run_case("match_tui")

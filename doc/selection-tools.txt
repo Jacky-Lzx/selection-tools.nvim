@@ -89,6 +89,8 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsDirectoryIcon Directory
   SelectionToolsPreviewLine  CursorLine
   SelectionToolsPreviewMatch Search
+  SelectionToolsPreviewTrack SelectionToolsBorder
+  SelectionToolsPreviewThumb Title
 
 The selected-row background is a lower-priority text range, so query highlights
 remain visible even when Search only defines a background color. Count styling
@@ -298,15 +300,19 @@ selection.open(opts)
       multi          Enable marks; default false, true for files/buffers.
       preview        { enabled=false, max_size=1048576, max_lines=10000,
                        max_line_length=1000, highlight_line=true,
-                       highlight_matches=true }. Built-in sources enable it.
+                       highlight_matches=true, scrollbar=true,
+                       position=true }. Built-in sources enable it.
                      title=true shows the preview title on its divider,
                      clipped to the available display cells; undo enables it.
+                     scrollbar overlays the right border; position shows scroll
+                     progress as a percentage with up/down arrows on the divider.
+                     Both hide when content fits. Disable either independently.
       preview_item   vim.ui.select-style function(item) returning a buffer
                      and optional pos. Caller buffers are displayed directly
                      without changing their options or deleting them.
       previewer      Custom function(ctx), optionally returning a cancel
                      function. ctx contains item, index, buf, win,
-                     is_cancelled(), set_lines(lines, ft, title, pos).
+                     is_cancelled(), set_lines(lines, ft, title, pos, metadata).
                      set_lines is safe from async callbacks. Late results
                      are ignored. The built-in previewer reads files
                      asynchronously and prefers unsaved loaded buffers.
@@ -335,6 +341,13 @@ still identify the current item. Cancellation does not return marked items.
 Marks survive local filtering but are cleared when the source replaces items.
 Binary and oversized files show an explanatory preview message. Preview
 scrolling preserves the input focus; preview never edits source buffers.
+The preview scrollbar and percentage follow the displayed window's scrolling,
+F3 expansion, resize and resume, including borrowed buffers and delta frames.
+The percentage measures travel through the loaded preview (0% top, 100% bottom).
+Previews limited by max_lines also show "truncated", even if all loaded lines
+fit. Images suppress text scroll indicators. Track and thumb colors use
+SelectionToolsPreviewTrack and SelectionToolsPreviewThumb; the percentage uses
+SelectionToolsCount.
 Explicit preview positions mark the target line with SelectionToolsPreviewLine.
 Grep supplies item.line_matches as zero-based, end-exclusive byte ranges on that
 line, highlighted with SelectionToolsPreviewMatch. The original item.code guards
@@ -588,6 +601,9 @@ ctx.set_buffer(buf,{owned=true,title="Preview"}) adopts a ready frame. The old
 owned frame is deleted only after replacement, or at picker close. Borrowed
 buffers are not deleted. Late owned frames are discarded and deleted. set_lines
 and paint switch back to the internal text buffer and release the owned frame.
+set_lines' fifth argument and paint/set_buffer metadata accept scrollable=false
+to suppress text scroll indicators (used by images), and truncated=true to mark
+an incomplete preview. preview_item results accept these fields as well.
 ctx.picker provides the owner. Preview providers otherwise keep the existing
 close/resize/retain protocol.
 

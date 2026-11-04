@@ -44,7 +44,7 @@ function M.provider(opts)
       if
         not ctx.paint(function(buf)
           vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Loading image…" })
-        end, { title = vim.fs.basename(path) })
+        end, { title = vim.fs.basename(path), scrollable = false })
       then
         return true
       end
@@ -60,7 +60,7 @@ function M.provider(opts)
         return not ctx.is_cancelled()
       end,
       paint = function(draw)
-        return ctx.paint(draw, { title = vim.fs.basename(path) })
+        return ctx.paint(draw, { title = vim.fs.basename(path), scrollable = false })
       end,
       on_error = function(message)
         ctx.set_lines({ "Image preview: " .. tostring(message) })

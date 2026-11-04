@@ -21,6 +21,8 @@ local defaults = {
     max_line_length = 1000,
     highlight_line = true,
     highlight_matches = true,
+    scrollbar = true,
+    position = true,
   },
   history = { limit = 100, persist = false },
   matcher = {

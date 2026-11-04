@@ -27,6 +27,8 @@ local function check()
   assert(api.nvim_get_hl(0, { name = "SelectionToolsSelected", link = false }).bg == rgb(c.ui.selection_bg))
   assert(api.nvim_get_hl(0, { name = "SelectionToolsMarked", link = false }).fg == 0x123456)
   assert(not api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false }).italic)
+  assert(api.nvim_get_hl(0, { name = "SelectionToolsPreviewTrack", link = false }).fg == rgb(c.ui.border))
+  assert(api.nvim_get_hl(0, { name = "SelectionToolsPreviewThumb", link = false }).fg == 0x123456)
 end
 check()
 local p = tools.select({ "alpha", "beta" }, {}, function() end)

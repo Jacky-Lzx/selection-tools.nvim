@@ -5,7 +5,12 @@ Preview.__index = Preview
 
 function Preview.new(picker, buf)
   vim.bo[buf].modifiable = false
-  return setmetatable({ picker = picker, buf = buf, generation = 0 }, Preview)
+  return setmetatable({
+    picker = picker,
+    buf = buf,
+    generation = 0,
+    scroll = require("selection_tools.preview_scroll").new(picker),
+  }, Preview)
 end
 
 function Preview:resize()
@@ -109,7 +114,7 @@ function Preview:_decorate(lines, pos)
   end
 end
 
-function Preview:write(lines, ft, title, pos)
+function Preview:write(lines, ft, title, pos, metadata)
   if self.picker.closed or not api.nvim_buf_is_valid(self.buf) then
     return
   end
@@ -150,6 +155,8 @@ function Preview:write(lines, ft, title, pos)
   self.picker.preview_title = title or "Preview"
   self.displayed = true
   self.displayed_item = self.item
+  self.scrollable = not metadata or metadata.scrollable ~= false
+  self.truncated = metadata and metadata.truncated or false
   self.picker:_restore_preview()
   self.picker:_draw_frame()
   self:_release_retained(false)
@@ -168,10 +175,10 @@ function Preview:update(item, index)
   local function current()
     return not self.picker.closed and self.generation == generation
   end
-  local function deliver(lines, ft, title, pos)
+  local function deliver(lines, ft, title, pos, metadata)
     vim.schedule(function()
       if current() then
-        self:write(lines, ft, title, pos)
+        self:write(lines, ft, title, pos, metadata)
       end
     end)
   end
@@ -198,6 +205,7 @@ function Preview:update(item, index)
       self.picker.preview_title = "Preview"
       self.displayed = true
       self.displayed_item = self.item
+      self.scrollable, self.truncated = result.scrollable ~= false, result.truncated or false
       self.picker:_restore_preview()
       self.picker:_draw_frame()
     else
@@ -245,6 +253,7 @@ function Preview:update(item, index)
       api.nvim_win_set_buf(ctx.win, buf)
       self:_release_buffer(metadata.owned and buf or nil, buf)
       self.displayed, self.displayed_item = true, item
+      self.scrollable, self.truncated = metadata.scrollable ~= false, metadata.truncated or false
       self.picker.preview_title = metadata.title or "Preview"
       self.picker:_draw_frame()
       self:_release_retained(false)
@@ -286,6 +295,8 @@ function Preview:update(item, index)
         return false
       end
       self.displayed, self.displayed_item = true, item
+      self.scrollable = not metadata or metadata.scrollable ~= false
+      self.truncated = metadata and metadata.truncated or false
       self.picker.preview_title = metadata and metadata.title or "Preview"
       api.nvim_win_set_cursor(win, { 1, 0 })
       api.nvim_win_call(win, function()
@@ -344,7 +355,8 @@ function Preview:update(item, index)
       lines,
       vim.bo[buf].filetype,
       api.nvim_buf_get_name(buf) ~= "" and vim.fn.fnamemodify(api.nvim_buf_get_name(buf), ":t") or "[No Name]",
-      type(item) == "table" and item.pos or nil
+      type(item) == "table" and item.pos or nil,
+      { truncated = api.nvim_buf_line_count(buf) > #lines }
     )
     return
   end
@@ -410,7 +422,9 @@ function Preview:update(item, index)
             if #lines > opts.preview.max_lines then
               limited[#limited + 1] = "… preview truncated"
             end
-            deliver(limited, ft, title, type(item) == "table" and item.pos or nil)
+            deliver(limited, ft, title, type(item) == "table" and item.pos or nil, {
+              truncated = #lines > opts.preview.max_lines,
+            })
           end
         end)
       end

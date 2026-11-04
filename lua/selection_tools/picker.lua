@@ -1,5 +1,6 @@
 local api = vim.api
 local ns = api.nvim_create_namespace("selection_tools")
+local position_ns = api.nvim_create_namespace("selection_tools_preview_position")
 local active
 
 ---@class selection_tools.Picker
@@ -22,6 +23,21 @@ end
 
 local function single_line(value)
   return tostring(value):gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("\t", "  "):gsub("%z", "\\0")
+end
+
+local function clip_cells(text, cells)
+  if cells <= 0 then
+    return ""
+  end
+  if vim.fn.strdisplaywidth(text) <= cells then
+    return text
+  end
+  local count = vim.fn.strchars(text, true)
+  repeat
+    count = count - 1
+    text = vim.fn.strcharpart(text, 0, count, true)
+  until vim.fn.strdisplaywidth(text .. "…") <= cells or count == 0
+  return text .. "…"
 end
 
 function Picker:_layout()
@@ -102,7 +118,8 @@ function Picker:_draw_separators()
     self.separator_wins = {}
   end
   vim.bo[self.separator_buf].modifiable = true
-  local lines = {}
+  local lines, positions = {}, {}
+  local progress = self.preview and self.preview.scroll:update()
   local preview_row = self.opts.layout.input_position == "bottom" and self.resolved.separators[1]
     or self.resolved.separators[#self.resolved.separators]
   local input_row = self.opts.layout.input_position == "bottom" and self.resolved.separators[#self.resolved.separators]
@@ -126,28 +143,40 @@ function Picker:_draw_separators()
     end
     local slot = i == #self.resolved.separators and "bottom" or "middle"
     title, position = require("selection_tools.border_labels").resolve(self, slot, title, position)
-    local body = string.rep(horizontal, self.resolved.width)
-    if title then
-      title = single_line(title)
-      local cells = math.max(0, self.resolved.width - 4)
-      if vim.fn.strdisplaywidth(title) > cells then
-        local count = vim.fn.strchars(title, true)
-        repeat
-          count = count - 1
-          title = vim.fn.strcharpart(title, 0, count, true)
-        until vim.fn.strdisplaywidth(title .. "…") <= cells or count == 0
-        title = cells > 0 and (title .. "…") or ""
+    local width, suffix = self.resolved.width, ""
+    if self.preview_win and row == preview_row and progress then
+      local text = clip_cells(progress, width - 4)
+      if text ~= "" then
+        suffix = " " .. text .. " " .. horizontal
+        width = width - vim.fn.strdisplaywidth(suffix)
       end
+    end
+    local body = string.rep(horizontal, width)
+    if title and width >= 4 then
+      title = single_line(title)
+      title = clip_cells(title, width - 4)
       local label = " " .. title .. " "
-      local available = self.resolved.width - vim.fn.strdisplaywidth(label)
+      local available = width - vim.fn.strdisplaywidth(label)
       local before = position == "center" and math.floor(available / 2)
         or (position == "right" and (available - 1) or 1)
       body = string.rep(horizontal, before) .. label .. string.rep(horizontal, available - before)
     end
-    lines[i] = (joints[left] and joints[left][1] or left) .. body .. (joints[right] and joints[right][2] or right)
+    local start = joints[left] and joints[left][1] or left
+    if suffix ~= "" then
+      positions[i] = { #start + #body, #start + #body + #suffix - #horizontal }
+    end
+    lines[i] = start .. body .. suffix .. (joints[right] and joints[right][2] or right)
   end
   api.nvim_buf_set_lines(self.separator_buf, 0, -1, false, lines)
   vim.bo[self.separator_buf].modifiable = false
+  api.nvim_buf_clear_namespace(self.separator_buf, position_ns, 0, -1)
+  for i, range in pairs(positions) do
+    api.nvim_buf_set_extmark(self.separator_buf, position_ns, i - 1, range[1], {
+      end_col = range[2],
+      hl_group = "SelectionToolsCount",
+      priority = 110,
+    })
+  end
   for i in ipairs(lines) do
     api.nvim_buf_set_extmark(self.separator_buf, ns, i - 1, 0, { id = i, line_hl_group = "SelectionToolsBorder" })
   end
@@ -734,6 +763,7 @@ function Picker:scroll_preview(direction)
   api.nvim_win_call(self.preview_win, function()
     vim.cmd("normal! " .. amount .. (direction > 0 and "\004" or "\021"))
   end)
+  self:_draw_separators()
 end
 
 function Picker:toggle()
@@ -797,6 +827,7 @@ function Picker:_restore_preview()
       vim.fn.winrestview(self.restore_view)
     end)
     self.restore_view = nil
+    self:_draw_separators()
   end
 end
 
@@ -909,6 +940,7 @@ function Picker:close(item, index, selected, outcome)
   self:_cancel_finder()
   if self.preview then
     self.preview:cancel()
+    self.preview.scroll:close()
   end
   require("selection_tools.history").add(self.history_key, self.query, self.opts.history)
   if self.group then
@@ -990,6 +1022,7 @@ function Picker:resize()
   if self.preview and self.preview_win then
     self.preview:resize()
   end
+  self:_draw_separators()
 end
 
 function Picker:expand_preview()
@@ -1215,6 +1248,8 @@ function Picker:_setup_highlights()
   })
   default_highlight("SelectionToolsPreviewLine", { link = "CursorLine" })
   default_highlight("SelectionToolsPreviewMatch", { link = "Search" })
+  default_highlight("SelectionToolsPreviewTrack", { link = "SelectionToolsBorder" })
+  default_highlight("SelectionToolsPreviewThumb", { link = "Title" })
 end
 
 function Picker:_mount(resolved)

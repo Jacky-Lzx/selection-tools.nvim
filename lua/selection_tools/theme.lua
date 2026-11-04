@@ -16,6 +16,8 @@ local function apply(c)
     SelectionToolsFileLocation = { fg = c.ui.muted, italic = false },
     SelectionToolsPreviewLine = { bg = c.ui.cursorline_bg },
     SelectionToolsPreviewMatch = { fg = c.ui.search_fg, bg = c.ui.search_bg },
+    SelectionToolsPreviewTrack = { fg = c.ui.border, bg = c.ui.float_bg },
+    SelectionToolsPreviewThumb = { fg = c.ui.accent, bg = c.ui.float_bg },
   }
   for name, value in pairs(groups) do
     vim.api.nvim_set_hl(0, name, value)

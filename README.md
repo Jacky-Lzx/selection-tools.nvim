@@ -293,6 +293,8 @@ For example, any custom source can show its current query with
 
 Previews read ordinary files asynchronously with filetype highlighting, preferring unsaved content from loaded buffers. Default limits are 1 MiB, 10000 lines, and 1000 bytes per line; oversized and binary files show a message. Switching items or closing the window invalidates old previews. Preview scrolling and list paging keep focus in the search input.
 
+Scrollable previews show a slim scrollbar over the right border and a percentage on the preview divider: `↓ 0%` at the top, `↑↓ 45%` between the ends, and `↑ 100%` at the bottom. Both hide when the content fits. The percentage describes travel through the loaded preview; previews limited by `max_lines` also show `truncated`. Images hide text scroll indicators. Normal text, caller-owned buffers and delta previews share this behavior, including provider-driven scrolling, F3 expansion, resizing and resume. Configure `preview = { scrollbar = false }` or `preview = { position = false }` to disable either indicator independently (both default to `true`). The scrollbar uses `SelectionToolsPreviewTrack` and `SelectionToolsPreviewThumb`; the percentage uses `SelectionToolsCount`.
+
 `select()` / `vim.ui.select` use a separate compact layout by default: input on top, a forward list below, 50% width (80–100 columns, adapting to narrow screens), and 40% height. Configure it with `setup({ select = { layout = ... } })`. When the caller provides `preview_item`, the returned buffer is displayed with its highlights preserved; the plugin does not modify or proactively delete caller-owned buffers.
 
 Query history is stored per source. By default it lasts only for the session. Enable `history.persist` to save it to `stdpath("state")/selection-tools/history.json`, or set `history.path`. Moving forward past the newest entry restores the draft query from before history browsing.
@@ -405,6 +407,7 @@ nvim --headless -u NONE -n -i NONE -l tests/borders.lua
 nvim --headless -u NONE -n -i NONE -l tests/labels.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
+nvim --headless -u NONE -n -i NONE -l tests/preview_scroll.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
 nvim --headless -u NONE -n -i NONE -l tests/on_change.lua
 nvim --headless -u NONE -n -i NONE -l tests/undo_tree.lua
