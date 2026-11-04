@@ -1,4 +1,7 @@
+local util = require("selection_tools.sources.util")
+
 return function(opts)
+  local target = util.file_window()
   local cwd = vim.fn.fnamemodify(opts.cwd or vim.fn.getcwd(), ":p")
   return {
     prompt = "Files",
@@ -68,6 +71,7 @@ return function(opts)
           vim.bo[buf].buflisted = true
           buffers[#buffers + 1] = buf
         end
+        util.focus_file_window(target)
         vim.api.nvim_set_current_buf(buffers[1])
       end
     end,

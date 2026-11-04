@@ -56,6 +56,19 @@ selection.files({ cwd = vim.fn.expand("~/project"), hidden = true, ignored = fal
 selection.buffers({ current = false }) -- Exclude the current buffer
 ```
 
+Confirming files, buffers or file locations uses an editor in the same tab.
+The current editor takes precedence, followed by the editor remembered before
+file/buffer search, the alternate window and other ordinary windows. If none
+remains, an unlocked `nofile` window (such as a dashboard) can be reused;
+otherwise confirmation creates an editor to the right. Cancellation restores
+the calling window without creating a split.
+
+Persistent sidebars should set the native window option
+`vim.wo[win].winfixbuf = true`. Protected windows, floating/preview windows,
+terminals, quickfix and prompt buffers are never replacement targets. No
+filetype names or cross-plugin buffer flags are needed. Explicit split/tab
+actions keep scratch UI buffers in their original window.
+
 `cwd` defaults to the working directory at the time of the call. File scanning runs asynchronously; subsequent queries filter the collected candidates. By default, scanning respects ignore rules and excludes hidden files; `.git` directories are always excluded. File and buffer pickers enable previews and multiple selection by default. Live full-text search is also available.
 
 Asynchronous searches and matching do not show `Loading` / `Matching` messages. While typing, the current list and preview stay visible until new results are ready. The list stays empty during the initial wait and shows `No results` only after a search finishes without matches. Confirmation, split opening, and result export are paused until the first results of a new search arrive, preventing actions on items from the previous query.
@@ -397,6 +410,7 @@ See `:help selection-tools` for configuration, key bindings, and the full API.
 stylua --check lua plugin tests
 nvim --headless -u NONE -n -i NONE -l tests/run.lua
 nvim --headless -u NONE -n -i NONE -l tests/sources.lua
+nvim --headless -u NONE -n -i NONE -l tests/file_windows.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua

@@ -1,4 +1,7 @@
+local util = require("selection_tools.sources.util")
+
 return function(opts)
+  local target = util.file_window()
   local current = vim.api.nvim_get_current_buf()
   local items = {}
   for _, info in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do
@@ -29,6 +32,7 @@ return function(opts)
     end,
     on_choice = function(item)
       if item and vim.api.nvim_buf_is_valid(item.bufnr) then
+        util.focus_file_window(target)
         vim.api.nvim_set_current_buf(item.bufnr)
       end
     end,

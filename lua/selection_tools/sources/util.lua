@@ -8,6 +8,48 @@ function M.path(path, cwd)
   return vim.fs.normalize(vim.fs.joinpath(cwd or vim.fn.getcwd(), path))
 end
 
+-- Resolve without moving focus: native protection governs replacement, while
+-- ordinary editors take precedence over unlocked scratch/start-screen windows.
+function M.file_window(preferred)
+  local tab = api.nvim_get_current_tabpage()
+  local candidates = { api.nvim_get_current_win(), preferred or 0, vim.fn.win_getid(vim.fn.winnr("#")) }
+  vim.list_extend(candidates, api.nvim_tabpage_list_wins(tab))
+  for _, kind in ipairs({ "", "nofile" }) do
+    for _, win in ipairs(candidates) do
+      if
+        win ~= 0
+        and api.nvim_win_is_valid(win)
+        and api.nvim_win_get_tabpage(win) == tab
+        and api.nvim_win_get_config(win).relative == ""
+        and not vim.wo[win].previewwindow
+        and not (vim.fn.exists("+winfixbuf") == 1 and vim.wo[win].winfixbuf)
+        and vim.bo[api.nvim_win_get_buf(win)].buftype == kind
+      then
+        return win
+      end
+    end
+  end
+end
+
+-- Only confirmation creates a missing editor. Cancelling preserves the sidebar.
+function M.focus_file_window(preferred, command)
+  local win = M.file_window(preferred)
+  if win then
+    api.nvim_set_current_win(win)
+    if command then
+      -- Explicit splits keep the start screen; never clone its scratch buffer
+      -- or trigger its leave/cleanup handlers from the new editor window.
+      if vim.bo[api.nvim_win_get_buf(win)].buftype ~= "" then
+        command = command == "split" and "new" or command == "vsplit" and "vnew" or command
+      end
+      vim.cmd(command)
+    end
+  else
+    local create = command == "split" and "new" or command == "tabnew" and "tabnew" or "vnew"
+    vim.cmd("rightbelow " .. create)
+  end
+end
+
 function M.jump(item)
   if not item then
     return
@@ -16,6 +58,7 @@ function M.jump(item)
   if not buf or not api.nvim_buf_is_valid(buf) then
     return
   end
+  M.focus_file_window()
   vim.cmd("normal! m'")
   vim.bo[buf].buflisted = true
   api.nvim_set_current_buf(buf)

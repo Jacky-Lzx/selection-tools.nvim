@@ -60,12 +60,10 @@ function M.edit(picker, mode)
   end
   local origin = picker.origin_win
   picker:close()
-  if vim.api.nvim_win_is_valid(origin) then
-    vim.api.nvim_set_current_win(origin)
-  end
+  local util = require("selection_tools.sources.util")
   for _, item in ipairs(items) do
-    vim.cmd(commands[mode])
-    require("selection_tools.sources.util").jump(vim.tbl_extend("force", {}, item, { bufnr = item.bufnr or item.buf }))
+    util.focus_file_window(origin, commands[mode])
+    util.jump(vim.tbl_extend("force", {}, item, { bufnr = item.bufnr or item.buf }))
   end
 end
 
