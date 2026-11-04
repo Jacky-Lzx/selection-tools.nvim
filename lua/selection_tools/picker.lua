@@ -34,6 +34,11 @@ function Picker:_draw_frame()
   if not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
     return
   end
+  local title, alignment = require("selection_tools.border_labels").resolve(self, "top", self.opts.prompt or "Select")
+  api.nvim_win_set_config(self.frame_win, {
+    title = title and (" " .. single_line(title) .. " ") or "",
+    title_pos = alignment,
+  })
   local lines = {}
   for i = 1, self.resolved.total_height do
     lines[i] = ""
@@ -119,6 +124,8 @@ function Picker:_draw_separators()
         title = path .. (filters and (" · " .. filters) or "")
       end
     end
+    local slot = i == #self.resolved.separators and "bottom" or "middle"
+    title, position = require("selection_tools.border_labels").resolve(self, slot, title, position)
     local body = string.rep(horizontal, self.resolved.width)
     if title then
       title = single_line(title)

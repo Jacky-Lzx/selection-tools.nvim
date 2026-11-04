@@ -27,7 +27,7 @@ def run_case(case):
             SELECTION_TOOLS_TEST_DIR=directory,
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
-        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
+        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui", "labels_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
         if configured:
             env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
         init = [] if configured else ["-u", "NONE"]
@@ -37,6 +37,8 @@ def run_case(case):
         )
         os.close(slave)
         actions = {"type_long": b"x" * 200, "type": b"\x15bta", "move": b"\x0e", "confirm": b"\r", "cancel": b"\x1b"}
+        if case == "labels_tui":
+            actions.update(type=b"beta")
         if case == "skim_tui":
             actions.update(prefix=b"b", suffix=b"ta", select=b"\t")
         if case == "image_tools_tui":
@@ -122,6 +124,7 @@ if __name__ == "__main__":
     run_case("live_tui")
     run_case("grep_columns_tui")
     run_case("workflows_tui")
+    run_case("labels_tui")
     run_case("syntax_tui")
     git_tools = os.environ.get("GIT_TOOLS_DIR", str(Path(__file__).resolve().parents[2] / "git-tools.nvim"))
     if shutil.which("delta") and Path(git_tools, "lua/git_tools/diff/init.lua").exists():

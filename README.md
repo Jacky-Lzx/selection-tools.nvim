@@ -254,6 +254,41 @@ require("selection_tools").setup({
 })
 ```
 
+Each border label can override its text and alignment independently, globally in
+`setup()` or per call in `open()`, `select()` and built-in pickers:
+
+```lua
+require("selection_tools").files({
+  layout = {
+    labels = {
+      top = { text = "Files", align = "left" },
+      middle = { align = "center" }, -- Keep the automatic path
+      bottom = { align = "right" },  -- Keep the automatic filters
+    },
+  },
+})
+```
+
+`top` names the outer top border; `middle` and `bottom` name the two internal
+dividers in screen order. With bottom input these show the title, path and
+filters, respectively. With top input the automatic filters/path swap dividers.
+Without a preview there is only one divider, controlled by `bottom`; its default
+combines the path and filters. `middle` is then absent.
+
+Each `text` accepts a string, `false`/`""` to hide the label, or
+`function(picker, default_text)` returning a string, `false`, or `nil` to keep the
+automatic text. Callbacks run on redraw, including query, selection, option and
+preview updates; keep them fast and free of side effects. Errors or invalid
+results warn once per label and fall back to automatic text. Omit `text` to keep
+the default; omit `align` to inherit `layout.title_pos` (or left alignment for a
+specialized preview title). `align` accepts `"left"`, `"center"` and `"right"`.
+Overrides also apply to specialized preview titles, such as Undo's comparison
+label. Labels escape control characters; divider text clips to display cells
+when space is limited.
+
+For example, any custom source can show its current query with
+`bottom = { text = function(p) return "Filter: " .. p.query end, align = "right" }`.
+
 `next` / `previous` move in screen directions; `select_previous` / `select_next` mark the current item and then move by candidate rank. Marks survive local filtering and are cleared when candidates are replaced. Confirming files adds the marked files to the buffer list and displays the first one; without marks, it opens the current item. Copy and system-open actions prefer marked items, falling back to the current item, and leave the picker open.
 
 Previews read ordinary files asynchronously with filetype highlighting, preferring unsaved content from loaded buffers. Default limits are 1 MiB, 10000 lines, and 1000 bytes per line; oversized and binary files show a message. Switching items or closing the window invalidates old previews. Preview scrolling and list paging keep focus in the search input.
@@ -367,6 +402,7 @@ nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
 nvim --headless -u NONE -n -i NONE -l tests/borders.lua
+nvim --headless -u NONE -n -i NONE -l tests/labels.lua
 nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua

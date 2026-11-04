@@ -8,6 +8,7 @@ function M.resolve(opts)
   local columns, lines = vim.o.columns, vim.o.lines - vim.o.cmdheight
   assert(columns >= 12 and lines >= 8, "selection-tools: window requires at least 12 columns and 8 rows")
   local layout = opts.layout
+  require("selection_tools.border_labels").validate(layout)
   local width = math.max(size(layout.width, columns), layout.min_width or 1)
   width = math.max(4, math.min(columns - 4, width, layout.max_width or columns))
   local height = math.max(4, math.min(lines - 2, size(layout.height, lines)))
@@ -30,7 +31,7 @@ function M.resolve(opts)
       zindex = 60,
       focusable = false,
       title = " " .. tostring(opts.prompt or "Select"):gsub("[\r\n]", " ") .. " ",
-      title_pos = layout.title_pos,
+      title_pos = layout.labels and layout.labels.top and layout.labels.top.align or layout.title_pos,
     },
     height = list_height,
     width = width,

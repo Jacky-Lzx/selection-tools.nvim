@@ -280,6 +280,21 @@ selection.open(opts)
                        offset item.content_offset within the formatted label;
                        item.file and item.pos identify the full source context.
       layout, keys   Per-call overrides of setup options.
+      layout.labels  Independent border labels: top, middle and bottom, each
+                     { text=..., align="left"|"center"|"right" }. Applies to
+                     setup() and per-call options. top is the outer title;
+                     middle/bottom are the internal dividers in screen order.
+                     With bottom input, defaults are title/path/filters. Top
+                     input swaps the automatic path/filters. Without preview,
+                     only bottom exists and combines path/filters by default.
+                     text: string, false/"" to hide, or fun(picker, default_text)
+                     returning string, false or nil (automatic). Omit text for
+                     automatic content. Callbacks run on redraw; keep them fast
+                     and free of side effects. Callback errors/invalid results
+                     warn once per label and use automatic content.
+                     align defaults to layout.title_pos, or left for explicit
+                     preview titles. Overrides include those preview titles.
+                     Controls are escaped; dividers clip by display cells.
       multi          Enable marks; default false, true for files/buffers.
       preview        { enabled=false, max_size=1048576, max_lines=10000,
                        max_line_length=1000, highlight_line=true,
