@@ -27,7 +27,7 @@ def run_case(case):
             SELECTION_TOOLS_TEST_DIR=directory,
             NVIM_LOG_FILE=str(Path(directory, "nvim.log")),
         )
-        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui", "labels_tui", "preview_scroll_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
+        configured = case in {"undo_tui", "delta_preview_tui", "workflows_tui", "labels_tui", "preview_scroll_tui", "opening_tui"} and env.get("SELECTION_TOOLS_CONFIGURED") == "1"
         if configured:
             env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
         init = [] if configured else ["-u", "NONE"]
@@ -123,6 +123,7 @@ def run_case(case):
 
 
 if __name__ == "__main__":
+    run_case("opening_tui")
     run_case("tui")
     run_case("mouse_tui")
     run_case("preview_tui")

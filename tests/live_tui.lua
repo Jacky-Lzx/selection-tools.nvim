@@ -57,7 +57,9 @@ local function snapshot()
   return { screen(p.list_win), screen(p.preview_win) }
 end
 local function retained()
-  assert(p.loading or p.syntax_pending, "search completed before the pending frame was checked")
+  -- A ready batch may be published before the process reports done. Only an
+  -- unfinished replacement must retain the previous frame, not all loading.
+  assert(p.finder_pending or p.syntax_pending, "replacement completed before the pending frame was checked")
   local current = snapshot()
   for pane = 1, 2 do
     for row, line in ipairs(current[pane]) do
@@ -129,7 +131,7 @@ timer:start(
           stage = "abc"
         end
       elseif stage == "abc" and p.query == "needle_abc" then
-        if p.loading or p.syntax_pending then
+        if p.finder_pending or p.syntax_pending then
           retained()
         else
           if p.preview.displayed_item ~= p:current() then
@@ -143,7 +145,7 @@ timer:start(
           stage = "empty"
         end
       elseif stage == "empty" and p.query == "needle_abcx" then
-        if p.loading or p.syntax_pending then
+        if p.finder_pending or p.syntax_pending then
           retained()
         else
           assert(#p.matches == 0)

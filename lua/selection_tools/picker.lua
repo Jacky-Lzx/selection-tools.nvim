@@ -96,7 +96,11 @@ local function scratch(filetype)
   vim.bo[buf].bufhidden = "wipe"
   -- Completion plugins must not replace picker navigation or confirmation keys.
   vim.b[buf].completion = false
-  vim.bo[buf].filetype = filetype
+  -- Private UI buffers need no filetype plugins. A FileType handler can redraw
+  -- Neovim's temporary buffer-call window over the source while we prepare it.
+  api.nvim_buf_call(buf, function()
+    vim.cmd("noautocmd setlocal filetype=" .. filetype)
+  end)
   vim.bo[buf].swapfile = false
   return buf
 end
@@ -191,12 +195,13 @@ function Picker:_draw_separators()
       height = 1,
       zindex = 62,
       focusable = false,
+      hide = self.mounting == true,
     }
     local win = self.separator_wins[i]
     if win and api.nvim_win_is_valid(win) then
       api.nvim_win_set_config(win, config)
     else
-      win = api.nvim_open_win(self.separator_buf, false, config)
+      win = api.nvim_open_win(self.separator_buf, false, vim.tbl_extend("force", config, { noautocmd = true }))
       self.separator_wins[i] = win
       vim.wo[win].wrap = false
       vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
@@ -1253,21 +1258,27 @@ function Picker:_setup_highlights()
 end
 
 function Picker:_mount(resolved)
+  -- Autocommands and option changes can redraw synchronously. Prepare every
+  -- pane off-screen so those redraws keep showing the source, not an empty box.
+  self.mounting = true
+  local function open(buf, config)
+    return api.nvim_open_win(buf, false, vim.tbl_extend("force", config, { hide = true, noautocmd = true }))
+  end
   self.frame_buf = scratch("selection_tools_frame")
   self.input_buf, self.list_buf = scratch("selection_tools_input"), scratch("selection_tools_list")
   api.nvim_buf_set_lines(self.input_buf, 0, -1, false, { self.query })
-  self.frame_win = api.nvim_open_win(self.frame_buf, false, resolved.frame)
-  self.list_win = api.nvim_open_win(self.list_buf, false, resolved.list)
+  self.frame_win = open(self.frame_buf, resolved.frame)
+  self.list_win = open(self.list_buf, resolved.list)
   if self.opts.preview.enabled then
     self.preview_buf = scratch("selection_tools_preview")
     -- A preview_item provider may temporarily display its own buffer in this pane.
     vim.bo[self.preview_buf].bufhidden = "hide"
     if resolved.preview then
-      self.preview_win = api.nvim_open_win(self.preview_buf, false, resolved.preview)
+      self.preview_win = open(self.preview_buf, resolved.preview)
     end
     self.preview = require("selection_tools.preview").new(self, self.preview_buf)
   end
-  self.input_win = api.nvim_open_win(self.input_buf, true, resolved.input)
+  self.input_win = open(self.input_buf, resolved.input)
   for _, name in ipairs({ "frame", "list", "input", "preview" }) do
     local win = self[name .. "_win"]
     if win then
@@ -1288,10 +1299,26 @@ function Picker:_mount(resolved)
   self:_events()
   active = self
   self.started = true
+  self.loading = self.opts.finder ~= nil
+  self:_draw_frame()
   self:_filter()
   if self.closed then
     return
   end
+  self.mounting = false
+  for _, name in ipairs({ "frame", "list", "input", "preview" }) do
+    local win = self[name .. "_win"]
+    if win then
+      api.nvim_win_set_config(win, { hide = false })
+    end
+  end
+  for _, win in ipairs(self.separator_wins) do
+    api.nvim_win_set_config(win, { hide = false })
+  end
+  if self.preview and self.preview.scroll.win then
+    api.nvim_win_set_config(self.preview.scroll.win, { hide = false })
+  end
+  api.nvim_set_current_win(self.input_win)
   if self.opts.finder then
     self:_find()
   end

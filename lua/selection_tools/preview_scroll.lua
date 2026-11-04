@@ -86,7 +86,9 @@ function Scroll:update()
     self.buf = api.nvim_create_buf(false, true)
     vim.bo[self.buf].bufhidden = "hide"
     vim.b[self.buf].completion = false
-    vim.bo[self.buf].filetype = "selection_tools_scrollbar"
+    api.nvim_buf_call(self.buf, function()
+      vim.cmd("noautocmd setlocal filetype=selection_tools_scrollbar")
+    end)
   end
   local size = math.max(1, math.floor(height * math.min(height, total) / total))
   local offset = math.floor((height - size) * progress)
@@ -113,11 +115,12 @@ function Scroll:update()
     border = "none",
     focusable = false,
     zindex = 63,
+    hide = p.mounting == true,
   }
   if self.win and api.nvim_win_is_valid(self.win) then
     api.nvim_win_set_config(self.win, config)
   else
-    self.win = api.nvim_open_win(self.buf, false, config)
+    self.win = api.nvim_open_win(self.buf, false, vim.tbl_extend("force", config, { noautocmd = true }))
     vim.wo[self.win].wrap = false
     vim.wo[self.win].winhighlight = "Normal:SelectionToolsPreviewTrack"
   end
