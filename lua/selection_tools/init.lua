@@ -64,6 +64,7 @@ end
 
 ---@param opts? table
 function M.setup(opts)
+  require("selection_tools.theme").setup()
   config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
   if config.ui_select and vim.ui.select ~= select_adapter then
     previous_select = vim.ui.select

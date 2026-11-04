@@ -431,3 +431,10 @@ Icon catalogs come from [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) an
 Highlight attributes, keymap/autocommand definitions, and user-command details are generated only when the current item is previewed. Keymap definition lookup reuses a script index within each picker and refreshes it for a new picker.
 
 Help, highlights, keymaps, autocommands, commands, and projects show the window before preparing candidates in batches. Input and cancellation remain available during loading, and the current query is applied when candidates are ready. Project scans reuse both found and missing project roots within a load. Lazy-loading tests verify lightweight entry-point registration at startup, plus input, cancellation, file-handle cleanup, and cache reuse during loading in a real terminal.
+
+When theme-tools.nvim is active, picker borders, selections, matches, marks and
+secondary text follow its shared semantic palette, including theme previews and
+restoration. The integration is optional, does not load theme-tools itself, and
+keeps standard Neovim highlight defaults when it is unavailable.
+Run `nvim --headless -u NONE -l tests/theme.lua` with the real sibling theme-tools
+checkout (or set `THEME_TOOLS_DIR`) to validate this integration.

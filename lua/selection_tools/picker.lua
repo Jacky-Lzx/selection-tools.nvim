@@ -1152,6 +1152,7 @@ function Picker:_events()
 end
 
 function Picker:_setup_highlights()
+  require("selection_tools.theme").setup()
   local function default_highlight(name, value)
     -- An explicit empty definition (for example after palette rollback) also
     -- needs defaults. nvim_set_hl(default=true) alone can skip cleared groups.
