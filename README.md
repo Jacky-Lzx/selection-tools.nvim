@@ -438,3 +438,13 @@ restoration. The integration is optional, does not load theme-tools itself, and
 keeps standard Neovim highlight defaults when it is unavailable.
 Run `nvim --headless -u NONE -l tests/theme.lua` with the real sibling theme-tools
 checkout (or set `THEME_TOOLS_DIR`) to validate this integration.
+
+## Shared icon display
+
+When theme-tools.nvim is configured, icons follow its shared icon API and
+`:ThemeToolsIcons` selection (mini.icons, nvim-web-devicons, ASCII, or hidden).
+Open views refresh when the display changes. Provider installation and updates
+belong to theme-tools; no extra icon dependency is needed for this integration.
+Without theme-tools, existing standalone defaults remain available.
+Local icon-disable options still apply. Configure shared overrides through
+`require("theme_tools").setup({ icons = { overrides = { ... } } })`.

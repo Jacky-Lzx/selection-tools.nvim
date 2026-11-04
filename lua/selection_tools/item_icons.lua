@@ -16,6 +16,29 @@ function M.new(opts)
     if type(item) ~= "table" then
       return
     end
+    local shared = package.loaded["theme_tools.icons"]
+    if type(shared) == "table" and type(shared.get) == "function" then
+      if item.dir then
+        return shared.get("directory", item.file or "")
+      end
+      local buf = item.bufnr or item.buf
+      local file = item.file
+      local ft
+      if type(buf) == "number" and api.nvim_buf_is_valid(buf) then
+        file, ft = file or api.nvim_buf_get_name(buf), vim.bo[buf].filetype
+      end
+      if file and file ~= "" then
+        local icon, hl, fallback = shared.get("file", file)
+        if fallback and ft and ft ~= "" then
+          return shared.get("filetype", ft)
+        end
+        return icon, hl
+      end
+      if buf then
+        return shared.get("filetype", ft or "")
+      end
+      return
+    end
     if item.dir then
       return "󰉋", "SelectionToolsDirectoryIcon"
     end
@@ -58,7 +81,16 @@ function M.new(opts)
     if not entry.icon_resolved then
       entry.icon_resolved = true
       local icon, hl
-      if opts.format_icon then
+      local shared = package.loaded["theme_tools.icons"]
+      local mode = type(shared) == "table" and shared.current()
+      if mode == "none" then
+        icon = ""
+      elseif mode == "ascii" then
+        icon, hl = automatic(entry.item)
+        if not icon and opts.format_icon then
+          icon, hl = shared.get("ui", "custom")
+        end
+      elseif opts.format_icon then
         local ok
         ok, icon, hl = pcall(opts.format_icon, entry.item, entry.index)
         if not ok then

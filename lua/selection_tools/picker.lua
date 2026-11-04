@@ -1045,6 +1045,17 @@ function Picker:_events()
       self:_setup_highlights()
     end,
   })
+  api.nvim_create_autocmd("User", {
+    group = self.group,
+    pattern = { "ThemeToolsIconsChanged", "ThemeToolsReady" },
+    callback = function()
+      for _, entry in ipairs(self.entries) do
+        entry.icon_resolved, entry.icon = nil, nil
+      end
+      self.icon_resolver = nil
+      self:_render()
+    end,
+  })
   api.nvim_create_autocmd("VimResized", {
     group = self.group,
     callback = function()

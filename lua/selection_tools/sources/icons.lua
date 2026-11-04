@@ -72,13 +72,18 @@ return function(opts)
       end
       add(builtin, "symbols")
       if opts.devicons ~= false then
-        local ok, devicons = pcall(require, "nvim-web-devicons")
-        if ok then
-          local list = {}
-          for name, icon in pairs(devicons.get_icons()) do
-            list[#list + 1] = { icon = icon.icon, name = icon.name or name }
+        local shared = package.loaded["theme_tools.icons"]
+        if type(shared) == "table" and type(shared.catalog) == "function" then
+          add(shared.catalog(), "theme-tools")
+        else
+          local ok, devicons = pcall(require, "nvim-web-devicons")
+          if ok then
+            local list = {}
+            for name, icon in pairs(devicons.get_icons()) do
+              list[#list + 1] = { icon = icon.icon, name = icon.name or name }
+            end
+            add(list, "devicons")
           end
-          add(list, "devicons")
         end
       end
       local sources = {}
