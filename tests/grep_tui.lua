@@ -7,6 +7,18 @@ vim.fn.writefile({ "\t中文 heldout_phase0 + help + heldout_phase1", "\t中文 
 vim.api.nvim_set_hl(0, "Normal", { fg = "#cdd6f4", bg = "#1e1e2e" })
 vim.api.nvim_set_hl(0, "Visual", { bg = "#6c7086" })
 vim.api.nvim_set_hl(0, "Search", { bg = "#604482" })
+-- Let ripgrep finish before the asynchronous syntax read so the readiness race
+-- spans several terminal frames, even on fast machines without a Rust parser.
+local read = vim.uv.fs_read
+vim.uv.fs_read = function(fd, size, offset, callback)
+  return read(fd, size, offset, function(err, data)
+    vim.schedule(function()
+      vim.defer_fn(function()
+        callback(err, data)
+      end, 120)
+    end)
+  end)
+end
 local p = tools.grep({
   cwd = directory,
   regex = true,
@@ -23,7 +35,16 @@ local function check(regex)
   vim.cmd.redraw()
   local top, left = unpack(vim.api.nvim_win_get_position(p.list_win))
   local found = spans()
-  assert(#found == 5, "Not all grep hits are highlighted")
+  assert(
+    #found == 5,
+    ("Expected 5 grep highlights, got %d (loading=%s, matching=%s, syntax_pending=%s, results=%d)"):format(
+      #found,
+      tostring(p.loading),
+      tostring(p.matching),
+      tostring(p.syntax_pending),
+      #p.matches
+    )
+  )
   for _, mark in ipairs(found) do
     local row = mark[2]
     local line = vim.api.nvim_buf_get_lines(p.list_buf, row, row + 1, false)[1]
@@ -52,7 +73,7 @@ local function check(regex)
   assert(p:matcher_status().backend == "none", "grep unexpectedly reran local matching")
   assert(vim.api.nvim_get_current_win() == p.input_win and vim.api.nvim_get_mode().mode == "i")
 end
-local stage, ticks, finished = "start", 0, false
+local stage, ticks, finished, pending_frames = "start", 0, false, 0
 local timer = assert(vim.uv.new_timer())
 local function mark(value)
   vim.fn.writefile({ value }, directory .. "/stage")
@@ -61,6 +82,7 @@ local function finish(ok, message)
   finished = true
   timer:stop()
   timer:close()
+  vim.uv.fs_read = read
   vim.fn.writefile(vim.split(message, "\n", { plain = true }), directory .. "/result")
   vim.cmd(ok and "qa!" or "cquit 1")
 end
@@ -74,10 +96,19 @@ timer:start(
     local ok, err = xpcall(function()
       ticks = ticks + 1
       assert(ticks < 500, "Grep terminal timeout at " .. stage)
-      if stage == "start" and not p.loading and vim.api.nvim_get_mode().mode == "i" then
+      if not p.loading and p.syntax_pending then
+        pending_frames = pending_frames + 1
+      end
+      assert(not p.error, p.error)
+      -- Search completion does not imply that the atomic list frame is painted.
+      -- Keep the highlight and screen assertions strict, but wait for syntax too.
+      if p.loading or p.matching or p.syntax_pending then
+        return
+      end
+      if stage == "start" and vim.api.nvim_get_mode().mode == "i" then
         mark("type")
         stage = "typed"
-      elseif stage == "typed" and p.query == "hel" and not p.loading then
+      elseif stage == "typed" and p.query == "hel" then
         check(false)
         mark("move")
         stage = "moved"
@@ -85,19 +116,20 @@ timer:start(
         check(false)
         p:set_query("heldout_phase[0-9]|help")
         stage = "regex"
-      elseif stage == "regex" and not p.loading then
+      elseif stage == "regex" then
         check(true)
         p:set_query("not_found")
         stage = "empty"
-      elseif stage == "empty" and not p.loading then
+      elseif stage == "empty" then
         assert(#p.matches == 0 and #spans() == 0, "Stale grep highlights survived")
         p:set_query("heldout_phase[0-9]|help")
         stage = "again"
-      elseif stage == "again" and not p.loading then
+      elseif stage == "again" then
         check(true)
         mark("confirm")
         stage = "chosen"
       elseif stage == "chosen" and p.closed then
+        assert(pending_frames >= 2, "The pending syntax window was not exercised")
         assert(vim.api.nvim_buf_get_name(0) == vim.uv.fs_realpath(path))
         assert(vim.api.nvim_win_get_cursor(0)[1] == 1)
         finish(
