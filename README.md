@@ -492,6 +492,11 @@ When theme-tools.nvim is active, picker borders, selections, matches, marks and
 secondary text follow its shared semantic palette, including theme previews and
 restoration. The integration is optional, does not load theme-tools itself, and
 keeps standard Neovim highlight defaults when it is unavailable.
+
+Public highlight definitions from your colorscheme or user overrides take precedence
+over shared palette updates. Private default targets are refreshed on theme changes.
+
+Run `nvim --headless -u NONE -l tests/theme_ownership.lua` for explicit override and rollback checks.
 Run `nvim --headless -u NONE -l tests/theme.lua` with the real sibling theme-tools
 checkout (or set `THEME_TOOLS_DIR`) to validate this integration.
 

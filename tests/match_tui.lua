@@ -7,7 +7,7 @@ vim.api.nvim_set_hl(0, "Normal", { fg = "#cdd6f4", bg = "#1e1e2e" })
 vim.api.nvim_set_hl(0, "Visual", { bg = "#6c7086" })
 vim.api.nvim_set_hl(0, "Search", { bg = "#604482" })
 vim.api.nvim_set_hl(0, "Comment", { fg = "#9399b2", italic = true, cterm = { italic = true } })
-vim.api.nvim_set_hl(0, "SelectionToolsCount", { link = "Comment" })
+vim.api.nvim_set_hl(0, "SelectionToolsCount", {})
 local p = tools.open({
   items = { "Figures/New_idea.png", "Figures/other.png" },
   multi = true,

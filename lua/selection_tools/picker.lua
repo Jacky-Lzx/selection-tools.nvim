@@ -1224,11 +1224,7 @@ end
 function Picker:_setup_highlights()
   require("selection_tools.theme").setup()
   local function default_highlight(name, value)
-    -- An explicit empty definition (for example after palette rollback) also
-    -- needs defaults. nvim_set_hl(default=true) alone can skip cleared groups.
-    if vim.tbl_isempty(api.nvim_get_hl(0, { name = name, create = false })) then
-      api.nvim_set_hl(0, name, value)
-    end
+    require("selection_tools.theme").define(name, value, true)
   end
   default_highlight("SelectionToolsBorder", { link = "FloatBorder" })
   default_highlight("SelectionToolsSelected", { link = "Visual" })
@@ -1236,15 +1232,12 @@ function Picker:_setup_highlights()
   default_highlight("SelectionToolsMarked", { link = "Special" })
   default_highlight("SelectionToolsUnmarked", { link = "Comment" })
   default_highlight("SelectionToolsMarkSeparator", { link = "Comment" })
-  local count_hl = api.nvim_get_hl(0, { name = "SelectionToolsCount", link = false, create = false })
-  if vim.tbl_isempty(count_hl) then
-    count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
-  end
+  local count_hl = api.nvim_get_hl(0, { name = "Comment", link = false })
   count_hl.italic = false
   if count_hl.cterm then
     count_hl.cterm.italic = false
   end
-  api.nvim_set_hl(0, "SelectionToolsCount", count_hl)
+  default_highlight("SelectionToolsCount", count_hl)
   default_highlight("SelectionToolsFileIcon", { link = "Comment" })
   default_highlight("SelectionToolsDirectoryIcon", { link = "Directory" })
   local file_color = api.nvim_get_hl(0, { name = "Comment", link = false })

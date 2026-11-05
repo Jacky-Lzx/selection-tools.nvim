@@ -2,6 +2,21 @@
 local M = {}
 local initialized, stop = false, nil
 
+-- Public groups are theme/user-owned; refresh only our private defaults.
+function M.define(name, value, fallback)
+  local api = vim.api
+  local target = "SelectionToolsDefault" .. name:sub(#"SelectionTools" + 1)
+  local function empty(group)
+    return vim.tbl_isempty(api.nvim_get_hl(0, { name = group, link = true, create = false }))
+  end
+  if not fallback or empty(target) then
+    local definition = vim.deepcopy(value)
+    definition.default = nil
+    api.nvim_set_hl(0, target, definition)
+  end
+  api.nvim_set_hl(0, name, { link = target, default = not empty(name) })
+end
+
 local function apply(c)
   local groups = {
     SelectionToolsBorder = { fg = c.ui.border, bg = c.ui.float_bg },
@@ -20,7 +35,7 @@ local function apply(c)
     SelectionToolsPreviewThumb = { fg = c.ui.accent, bg = c.ui.float_bg },
   }
   for name, value in pairs(groups) do
-    vim.api.nvim_set_hl(0, name, value)
+    M.define(name, value)
   end
 end
 
