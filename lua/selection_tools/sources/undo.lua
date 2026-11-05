@@ -113,9 +113,10 @@ return function(opts)
         local _, text = snapshot(ctx.item.parent)
         before = text
       end
-      local patch = diff.unified(before, target_text, {
+      local patch, source = diff.unified(before, target_text, {
         old_path = (compare == "parent" and ("undo-" .. from) or "current") .. "/" .. filename,
         new_path = "undo-" .. ctx.item.seq .. "/" .. filename,
+        ft = vim.bo[origin.buf].filetype,
       })
       if #patch == 0 then
         ctx.set_lines(
@@ -138,20 +139,16 @@ return function(opts)
           )
         end,
       })
-      return diff.render(
-        view,
-        patch,
-        {
-          backend = opts.backend or "native",
-          native = vim.tbl_extend("force", { file_header = false }, opts.native or {}),
-          delta = delta,
-          cwd = cwd,
-          title = title,
-        },
-        function()
-          return vim.api.nvim_buf_is_valid(origin.buf) and vim.api.nvim_buf_get_changedtick(origin.buf) == origin.tick
-        end
-      )
+      return diff.render(view, patch, {
+        backend = opts.backend or "native",
+        sources = { source },
+        native = vim.tbl_extend("force", { file_header = false }, opts.native or {}),
+        delta = delta,
+        cwd = cwd,
+        title = title,
+      }, function()
+        return vim.api.nvim_buf_is_valid(origin.buf) and vim.api.nvim_buf_get_changedtick(origin.buf) == origin.tick
+      end)
     end,
     on_choice = function(item)
       if item and not item.current then
