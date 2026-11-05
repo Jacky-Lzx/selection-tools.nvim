@@ -527,11 +527,15 @@ picker gets a fresh index.
                    Initial states and pruned parents show full snapshots with
                    an explanatory title. Distinct nodes with identical text
                    can produce equal hunks in current comparison mode.
-                   Uses git-tools.nvim's delta renderer by default. Repeated
+                   wrap=true/false overrides git-tools' diff.wrap default.
+                   Alt+Z (undo_wrap) toggles wrap in input/list (i/n), including
+                   initial snapshots and no-change pages. Wrap survives node
+                   changes and F4 switches; side-by-side diffs wrap each column.
+                   Uses git-tools.nvim's native renderer by default. Repeated
                    file comparison headings are omitted. Hunk locations
                    remain visible. Custom delta.args override this default.
                    Missing/failed delta falls back to native diff;
-                   backend='vim' forces it.
+                   backend='vim' shows raw patch text.
                    delta={command='delta',args={},timeout=2000} customizes it.
                    Without git-tools.nvim, previews full historical snapshots.
   search_history   Newest search patterns. Confirm restores / and searches the

@@ -48,6 +48,23 @@ return function(opts)
     local lines = vim.api.nvim_buf_get_lines(clone, 0, -1, false)
     return lines, table.concat(lines, "\n") .. (vim.bo[clone].endofline and "\n" or "")
   end
+  local function wrap_value(picker)
+    if picker.git_tools_diff_wrap ~= nil then
+      return picker.git_tools_diff_wrap
+    end
+    local available, window = pcall(require, "git_tools.diff.window")
+    return available and window.options({ wrap = opts.wrap }).wrap or opts.wrap == true
+  end
+  local function show(ctx, lines, ft, title)
+    ctx.set_lines(lines, ft, title)
+    -- set_lines publishes asynchronously and may switch the displayed buffer,
+    -- which restores that buffer's saved window options.
+    vim.schedule(function()
+      if not ctx.is_cancelled() and vim.api.nvim_win_is_valid(ctx.win) then
+        vim.wo[ctx.win].wrap = wrap_value(ctx.picker)
+      end
+    end)
+  end
   return {
     prompt = "Undo · " .. filename .. " · F4 compare",
     compare = opts.compare or "parent",
@@ -66,6 +83,17 @@ return function(opts)
     end,
     preview = { enabled = true, title = true },
     actions = {
+      undo_wrap = function(picker)
+        local provider = picker.preview and picker.preview.provider
+        if type(provider) == "table" and type(provider.toggle_wrap) == "function" then
+          provider:toggle_wrap()
+        else
+          picker.git_tools_diff_wrap = not wrap_value(picker)
+          if picker.preview_win and vim.api.nvim_win_is_valid(picker.preview_win) then
+            vim.wo[picker.preview_win].wrap = picker.git_tools_diff_wrap
+          end
+        end
+      end,
       undo_compare = function(picker)
         picker.opts.compare = picker.opts.compare == "parent" and "current" or "parent"
         if picker.opts.source_opts then
@@ -77,12 +105,12 @@ return function(opts)
         picker:_render()
       end,
     },
-    keys = { undo_compare = { "<F4>" } },
+    keys = { undo_compare = { "<F4>" }, undo_wrap = { "<M-z>" } },
     on_close = cleanup,
     previewer = function(ctx)
       vim.wo[ctx.win].number = false
       if not vim.api.nvim_buf_is_valid(origin.buf) or vim.api.nvim_buf_get_changedtick(origin.buf) ~= origin.tick then
-        ctx.set_lines({ "Original buffer changed; reopen undo history" })
+        show(ctx, { "Original buffer changed; reopen undo history" })
         return
       end
       local compare = ctx.picker.opts.compare
@@ -93,19 +121,19 @@ return function(opts)
         ctx.item.seq
       )
       if compare == "current" and ctx.item.current then
-        ctx.set_lines({ "Current version (no changes)" }, "text", title)
+        show(ctx, { "Current version (no changes)" }, "text", title)
         return
       end
       local target, target_text = snapshot(ctx.item.seq)
       if compare == "parent" and ctx.item.parent == nil then
         local reason = ctx.item.seq == 0 and "Initial state (no parent change)"
           or "Parent snapshot is no longer in undo history"
-        ctx.set_lines(#target == 1 and target[1] == "" and { reason } or target, vim.bo[origin.buf].filetype, reason)
+        show(ctx, #target == 1 and target[1] == "" and { reason } or target, vim.bo[origin.buf].filetype, reason)
         return
       end
       local available, diff = pcall(require, "git_tools.diff")
       if not available then
-        ctx.set_lines(target, vim.bo[origin.buf].filetype, "Undo snapshot · install git-tools.nvim for diff")
+        show(ctx, target, vim.bo[origin.buf].filetype, "Undo snapshot · install git-tools.nvim for diff")
         return
       end
       local before = current_text
@@ -119,7 +147,8 @@ return function(opts)
         ft = vim.bo[origin.buf].filetype,
       })
       if #patch == 0 then
-        ctx.set_lines(
+        show(
+          ctx,
           { compare == "parent" and "No text changes in this step" or "Current version (no changes)" },
           "text",
           title
@@ -141,6 +170,7 @@ return function(opts)
       })
       return diff.render(view, patch, {
         backend = opts.backend or "native",
+        wrap = opts.wrap,
         sources = { source },
         native = vim.tbl_extend("force", { file_header = false }, opts.native or {}),
         delta = delta,
