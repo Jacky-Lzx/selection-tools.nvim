@@ -117,6 +117,16 @@ with no matches does nothing. Escape/Ctrl-C cancels. Opening another picker
 cancels the old one. Leaving the picker windows cancels it. External window
 closure and input buffer destruction also clean up the picker.
 
+With 'mouse' enabled, left-click selects a result and dragging browses rows.
+Double-click confirms using before_confirm, respecting 'mousetime' (0 disables
+double-clicks). CTRL-click toggles a mark when multi=true. The wheel over the
+list/input moves three results in screen order without wrapping; over the
+preview/scrollbar it scrolls three lines. Search focus and mode are preserved.
+Clicking the input positions its cursor and resumes editing from Normal-mode
+list navigation. Empty rows and borders do not confirm or close. An outside
+editor click cancels and leaves the clicked editor in Normal mode. Mappings
+are buffer-local; global mouse options are unchanged.
+
 The current-position/result-count indicator appears at the right of the input
 row, with space reserved even when the query scrolls horizontally. The position
 is 1-based within the filtered results; no matches displays 0/0. Loading and

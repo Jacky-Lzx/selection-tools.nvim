@@ -9,18 +9,23 @@ local function run()
   local function wait(test, message)
     local started = vim.uv.hrtime()
     while not test() do
-      assert((vim.uv.hrtime() - started) / 1e6 < 3000, message)
+      assert(
+        (vim.uv.hrtime() - started) / 1e6 < 3000,
+        message
+          .. ": "
+          .. vim.inspect({ mouse = vim.fn.getmousepos(), win = api.nvim_get_current_win(), mode = vim.fn.mode() })
+      )
       coroutine.yield()
     end
   end
   vim.cmd("enew!")
   local origin = api.nvim_get_current_win()
   local origin_buf = api.nvim_get_current_buf()
-  api.nvim_buf_set_lines(origin_buf, 0, -1, false, { "origin buffer text" })
+  api.nvim_buf_set_lines(origin_buf, 0, -1, false, { "origin buffer text", "second line", "mouse target text" })
   vim.cmd("vnew")
   local split = api.nvim_get_current_win()
   local split_buf = api.nvim_get_current_buf()
-  api.nvim_buf_set_lines(split_buf, 0, -1, false, { "other buffer text" })
+  api.nvim_buf_set_lines(split_buf, 0, -1, false, { "other buffer text", "second line", "mouse target text" })
   api.nvim_set_current_win(origin)
 
   for index, destination in ipairs({ origin, split }) do
@@ -35,15 +40,16 @@ local function run()
       return api.nvim_get_current_win() == p.input_win and vim.fn.mode() == "i"
     end, "picker must accept Insert-mode input before the mouse click")
 
-    local position = vim.fn.screenpos(destination, 1, 1)
+    vim.cmd.redraw()
+    local position = vim.fn.screenpos(destination, 3, 8)
     local row, col = position.row, position.col
     local frame = p.resolved.frame
     assert(row > 0 and col > 0 and row <= frame.row, "mouse target must be outside the picker")
     vim.fn.writefile({ (col + 4) .. " " .. row }, directory .. "/mouse")
     vim.fn.writefile({ "click_" .. index }, directory .. "/stage")
     wait(function()
-      return p.closed
-    end, "outside mouse click closes the picker")
+      return p.closed and vim.fn.mode() == "n"
+    end, "outside mouse click closes the picker in Normal mode")
     assert(vim.fn.mode() == "n", "outside mouse click must leave Normal mode, got " .. vim.fn.mode())
     assert(api.nvim_get_current_win() == destination, "closing must keep the clicked window focused")
     assert(calls == 1, "outside click must cancel exactly once")

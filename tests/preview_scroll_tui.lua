@@ -131,9 +131,7 @@ timer:start(
       elseif stage == "native" and label():find("↓ 0%", 1, true) then
         check(true) -- A scroll outside the picker action must refresh progress.
         prior_label = label()
-        -- Picker previews are non-focusable by default. Opt in for this native
-        -- mouse-wheel check; the wheel must still keep focus in the input.
-        api.nvim_win_set_config(p.preview_win, { focusable = true })
+        -- Mouse scrolling must work with the default non-focusable preview.
         local cfg = api.nvim_win_get_config(p.preview_win)
         vim.fn.writefile({ (cfg.col + 10) .. " " .. (cfg.row + 3) }, directory .. "/mouse")
         mark("scroll_mouse")
@@ -159,6 +157,13 @@ timer:start(
       elseif stage == "delta_scroll" and label() ~= prior_label then
         check(true)
         assert(label():find("↑↓", 1, true))
+        prior_label = label()
+        local cfg = api.nvim_win_get_config(p.preview_win)
+        vim.fn.writefile({ (cfg.col + 10) .. " " .. (cfg.row + 3) }, directory .. "/mouse")
+        mark("scroll_mouse_delta")
+        stage = "delta_mouse"
+      elseif stage == "delta_mouse" and label() ~= prior_label then
+        check(true)
         mark("cancel")
         stage = "closed"
       elseif stage == "closed" and p.closed then

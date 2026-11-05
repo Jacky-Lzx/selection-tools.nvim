@@ -50,6 +50,8 @@ With no arguments, the command searches files. Source names support completion.
 
 Type to fuzzy search with smart case: lowercase queries ignore case, while queries containing uppercase characters are case sensitive. Move with `<C-n>` / `<Down>` and `<C-p>` / `<Up>`, confirm with `<CR>`, and cancel with `<Esc>` / `<C-c>`. The results list also supports Normal mode `j` / `k`; press `/` to return to the search input. When there are no matches, Enter leaves the window open without selecting another item.
 
+With Neovim mouse support enabled (`set mouse=a`), click a result to select it or drag across rows to browse. Double-click confirms through the usual confirmation validation; it follows Neovim's `mousetime` setting (a value of `0` disables double-clicks). Ctrl-click toggles a mark when multiple selection is enabled. The wheel over the list or search input moves three results in screen order without wrapping; over the preview or its scrollbar it scrolls three lines. These interactions preserve the search focus and mode. Click the input to position its cursor and resume editing from Normal-mode list navigation. Empty rows and borders do not confirm or close the picker. Clicking an editor outside the picker cancels and leaves that editor in Normal mode. Mouse mappings are local to picker buffers; the plugin does not change global mouse settings.
+
 ```lua
 local selection = require("selection_tools")
 selection.files({ cwd = vim.fn.expand("~/project"), hidden = true, ignored = false })

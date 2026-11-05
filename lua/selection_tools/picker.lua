@@ -760,13 +760,14 @@ function Picker:scroll_list(direction)
   self:_render()
 end
 
-function Picker:scroll_preview(direction)
+function Picker:scroll_preview(direction, lines)
   if self.closed or not self.preview_win or not api.nvim_win_is_valid(self.preview_win) then
     return
   end
-  local amount = math.max(1, math.floor(api.nvim_win_get_height(self.preview_win) / 2))
+  local amount = lines or math.max(1, math.floor(api.nvim_win_get_height(self.preview_win) / 2))
   api.nvim_win_call(self.preview_win, function()
-    vim.cmd("normal! " .. amount .. (direction > 0 and "\004" or "\021"))
+    local key = lines and (direction > 0 and "\005" or "\025") or (direction > 0 and "\004" or "\021")
+    vim.cmd("normal! " .. amount .. key)
   end)
   self:_draw_separators()
 end
@@ -1203,6 +1204,7 @@ function Picker:_events()
       action(self)
     end
   end
+  require("selection_tools.mouse").setup(self)
   for action, keys in pairs(self.opts.keys) do
     assert(actions[action], "selection-tools: unknown key action: " .. action)
     for _, key in ipairs(keys) do
