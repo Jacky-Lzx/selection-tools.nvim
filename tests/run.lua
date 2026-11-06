@@ -1,4 +1,5 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
+dofile("tests/setup_contract.lua")
 dofile("tests/command_ownership.lua")
 vim.o.swapfile = false
 

@@ -66,8 +66,27 @@ end
 
 ---@param opts? table
 function M.setup(opts)
+  assert(opts == nil or type(opts) == "table", "selection-tools.nvim: setup expects a table")
+  opts = vim.deepcopy(opts or {})
+  local candidate = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts)
+  assert(type(candidate.ui_select) == "boolean", "ui_select must be boolean")
+  assert(type(candidate.layout) == "table", "layout must be a table")
+  for _, key in ipairs({ "width", "height", "preview_height" }) do
+    local value = candidate.layout[key]
+    assert(type(value) == "number" and value > 0 and value < math.huge, "layout." .. key .. " must be positive")
+  end
+  assert(type(candidate.layout.reverse) == "boolean", "layout.reverse must be boolean")
+  assert(
+    candidate.layout.input_position == "top" or candidate.layout.input_position == "bottom",
+    "invalid input_position"
+  )
+  require("selection_tools.border_labels").validate(candidate.layout)
+  assert(
+    type(candidate.preview) == "table" and type(candidate.preview.enabled) == "boolean",
+    "preview.enabled must be boolean"
+  )
   require("selection_tools.theme").setup()
-  config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
+  config = candidate
   if config.ui_select and vim.ui.select ~= select_adapter then
     previous_select = vim.ui.select
     vim.ui.select = select_adapter
@@ -75,6 +94,22 @@ function M.setup(opts)
     vim.ui.select = previous_select
     previous_select = nil
   end
+end
+
+function M.dispose()
+  local picker = package.loaded["selection_tools.picker"]
+  if picker then
+    picker.dispose()
+  end
+  if vim.ui.select == select_adapter then
+    vim.ui.select = previous_select
+  end
+  previous_select = nil
+  local theme = package.loaded["selection_tools.theme"]
+  if theme then
+    theme.dispose()
+  end
+  config = vim.deepcopy(defaults)
 end
 
 ---Open a searchable picker. See :help selection-tools-api.

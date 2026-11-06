@@ -57,4 +57,13 @@ function M.setup()
   attach()
 end
 
+function M.dispose()
+  if stop then
+    stop()
+    stop = nil
+  end
+  initialized = false
+  pcall(vim.api.nvim_del_augroup_by_name, "SelectionToolsTheme")
+end
+
 return M

@@ -516,3 +516,15 @@ Commands belong to the plugin; choose global entry keys and short aliases in
 your configuration. Registration reports same-name conflicts without replacing
 user commands. Reconfiguration refreshes only commands still owned by this
 plugin, and cleanup preserves subsequent user replacements.
+
+## Setup contract
+
+`setup(nil)` uses defaults. Configuration must be a table; caller-owned tables
+are copied before use. Invalid configuration types do not replace live handlers
+or commands. Repeating setup must not accumulate automatic registrations.
+
+`setup(opts)` validates layout and adapter options before changing the current
+configuration or `vim.ui.select`. `dispose()` closes the owned picker, cancels
+its asynchronous work, releases theme subscriptions and restores `vim.ui.select`
+only while still owned. It resets setup options, preserves registered custom
+sources, and is safe to repeat; call setup to install the adapter again.

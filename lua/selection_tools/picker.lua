@@ -1375,4 +1375,10 @@ function Picker.new(opts)
   return self
 end
 
+function Picker.dispose()
+  if active then
+    active:close(nil, nil, nil, { reason = "dispose" })
+  end
+end
+
 return Picker
