@@ -535,6 +535,7 @@ nvim --headless -u NONE -n -i NONE -l tests/file_windows.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
 nvim --headless -u NONE -n -i NONE -l tests/components.lua
+nvim --headless -u NONE -n -i NONE -l tests/rendering.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua

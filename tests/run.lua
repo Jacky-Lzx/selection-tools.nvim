@@ -86,7 +86,14 @@ test("Unicode, fuzzy positions, wrapping and empty results", function()
   p:set_query("你好")
   eq(p:current(), "你好 world")
   local marks = vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })
-  assert(#marks >= 3)
+  local painted = {}
+  for _, mark in ipairs(marks) do
+    if mark[4].hl_group == "SelectionToolsMatch" then
+      local line = vim.api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
+      painted[#painted + 1] = line:sub(mark[3] + 1, mark[4].end_col)
+    end
+  end
+  eq(table.concat(painted), "你好")
   p:set_query("hl")
   eq(#p.matches, 2)
   p:move(-1)

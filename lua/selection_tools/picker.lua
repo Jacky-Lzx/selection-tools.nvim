@@ -2,6 +2,7 @@ local api = vim.api
 local ns = api.nvim_create_namespace("selection_tools")
 local position_ns = api.nvim_create_namespace("selection_tools_preview_position")
 local active
+local empty_ranges = {}
 
 ---@class selection_tools.Picker
 ---@field input_buf integer
@@ -440,9 +441,61 @@ function Picker:_highlights(entry)
   return entry.highlights
 end
 
+-- Matchers return character positions. Convert each consecutive run once, and
+-- share the byte intervals between clipping and painting. The cache is pruned
+-- to visible entries after each published frame.
+function Picker:_match_ranges(entry, index)
+  local positions = self.positions[index]
+  if not positions and self.match_backend == "skim" then
+    positions = vim.fn.matchfuzzypos({ entry.text }, self.query, { matchseq = 1 })[2][1] or {}
+    self.positions[index] = positions
+  end
+  self.match_range_cache = self.match_range_cache or {}
+  local cached = self.match_range_cache[entry]
+  if cached and cached.query == self.query and cached.positions == positions then
+    return cached.ranges
+  end
+  local ranges, first, last = {}, nil, nil
+  local function append()
+    if first then
+      local a, b = vim.fn.byteidx(entry.text, first), vim.fn.byteidx(entry.text, last + 1)
+      if a >= 0 and b > a then
+        ranges[#ranges + 1] = { a, b }
+      end
+    end
+  end
+  for _, pos in ipairs(positions or empty_ranges) do
+    if last and pos == last + 1 then
+      last = pos
+    else
+      append()
+      first, last = pos, pos
+    end
+  end
+  append()
+  self.match_range_cache[entry] = { query = self.query, positions = positions, ranges = ranges }
+  return ranges
+end
+
+function Picker:_focus_ranges(entry, index)
+  local ranges = self:_match_ranges(entry, index)
+  local cached = self.match_range_cache[entry]
+  local highlights = self:_highlights(entry)
+  if cached.focus_source ~= highlights then
+    local focus = {}
+    for _, range in ipairs(highlights) do
+      if range.hl == nil or range.hl == "SelectionToolsMatch" then
+        focus[#focus + 1] = range
+      end
+    end
+    cached.focus_source, cached.focus = highlights, #focus > 0 and focus or ranges
+  end
+  return cached.focus
+end
+
 function Picker:_syntax(entry)
   if self.components and not self.components.syntax_code then
-    return {}
+    return empty_ranges
   end
   local item = entry.item
   if
@@ -453,7 +506,7 @@ function Picker:_syntax(entry)
     or not item.code
     or not (self.components or item.content_offset)
   then
-    return {}
+    return empty_ranges
   end
   if not self.syntax then
     self.syntax = require("selection_tools.syntax").new(self)
@@ -550,17 +603,7 @@ function Picker:_render()
     local entry = self.matches[index]
     local prefix = show_marks and ((self.marks[entry.index] and "●" or "○") .. " │ ") or ""
     if columns or self.components then
-      local focus = vim.tbl_filter(function(range)
-        return range.hl == nil or range.hl == "SelectionToolsMatch"
-      end, self:_highlights(entry))
-      if #focus == 0 then
-        if not self.positions[index] and self.match_backend == "skim" then
-          self.positions[index] = vim.fn.matchfuzzypos({ entry.text }, self.query, { matchseq = 1 })[2][1] or {}
-        end
-        for _, pos in ipairs(self.positions[index] or {}) do
-          focus[#focus + 1] = { vim.fn.byteidx(entry.text, pos), vim.fn.byteidx(entry.text, pos + 1) }
-        end
-      end
+      local focus = (columns or self.components.needs_focus) and self:_focus_ranges(entry, index) or empty_ranges
       if self.components then
         rows[row] = self.components:render(entry, component_widths, prefix .. component_prefix, focus, syntax[row])
       else
@@ -590,6 +633,10 @@ function Picker:_render()
     lines[1] = self.error and ("Error: " .. single_line(self.error))
       or ((self.loading or self.matching) and "" or "No results")
   end
+  if self.components then
+    self.components:retain(self.row_to_index, self.matches)
+  end
+  local visible_ranges = {}
   self.rendering = true
   vim.bo[self.list_buf].modifiable = true
   api.nvim_buf_set_lines(self.list_buf, 0, -1, false, lines)
@@ -644,25 +691,16 @@ function Picker:_render()
           priority = 100,
         })
       end
-      if not self.positions[index] and self.match_backend == "skim" then
-        -- Only visible rows need highlight positions from the native matcher.
-        self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
-          or {}
-      end
       for _, span in ipairs(not self.components and syntax[row] or {}) do
         highlight(span[1], span[2], span.hl, span.priority)
       end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
         highlight(range[1], range[2], range.hl or "SelectionToolsMatch", range.priority or 110)
       end
-      for _, pos in ipairs(self.positions[index] or {}) do
-        highlight(
-          vim.fn.byteidx(self.matches[index].text, pos),
-          vim.fn.byteidx(self.matches[index].text, pos + 1),
-          "SelectionToolsMatch",
-          110
-        )
+      for _, range in ipairs(self:_match_ranges(self.matches[index], index)) do
+        highlight(range[1], range[2], "SelectionToolsMatch", 110)
       end
+      visible_ranges[self.matches[index]] = self.match_range_cache[self.matches[index]]
     end
     local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
     -- A text range respects match priorities; line_hl_group can mask bg-only Search.
@@ -677,6 +715,7 @@ function Picker:_render()
   else
     api.nvim_buf_set_extmark(self.list_buf, ns, 0, 0, { line_hl_group = "Comment" })
   end
+  self.match_range_cache = visible_ranges
   self.rendering = false
   self:_draw_frame()
   if self.preview and self.preview_win then

@@ -38,7 +38,7 @@ local function check(expect_hit)
   for _, mark in ipairs(api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })) do
     local line = api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
     if mark[4].hl_group == "SelectionToolsMatch" then
-      hits = hits + 1
+      hits = hits + mark[4].end_col - mark[3]
       local cell = vim.fn.strwidth(line:sub(1, mark[3]))
       assert(
         vim.fn.screenstring(top + mark[2] + 1, left + cell + 1) == line:sub(mark[3] + 1, mark[3] + 1),

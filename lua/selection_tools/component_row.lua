@@ -33,7 +33,10 @@ end
 function Row.new(opts)
   assert(type(opts.components) == "table" and vim.islist(opts.components), "selection-tools: components must be a list")
   assert(type(opts.component_defaults or {}) == "table", "selection-tools: component_defaults must be a table")
-  local self = setmetatable({ specs = {}, automatic_icon = false, match_text = opts.match_text, search_count = 0 }, Row)
+  local self = setmetatable(
+    { specs = {}, order = {}, row_cache = {}, automatic_icon = false, match_text = opts.match_text, search_count = 0 },
+    Row
+  )
   assert(
     opts.match_text == nil or type(opts.match_text) == "function",
     "selection-tools: match_text must be a function"
@@ -93,7 +96,15 @@ function Row.new(opts)
     end
     self.automatic_icon = self.automatic_icon or spec.kind == "icon" and not spec.get and not spec.field
     self.syntax_code = self.syntax_code or spec.field == "code" and not spec.get
+    self.needs_focus = self.needs_focus or spec.truncate == "match"
+    self.order[#self.order + 1] = #self.specs
   end
+  table.sort(self.order, function(a, b)
+    if self.specs[a].priority == self.specs[b].priority then
+      return a > b
+    end
+    return self.specs[a].priority < self.specs[b].priority
+  end)
   return self
 end
 
@@ -215,25 +226,26 @@ end
 -- Measure visible rows only. Shrink lower-priority columns first, then omit
 -- them if their minimum widths cannot fit. Empty columns consume no gap.
 function Row:widths(entries, cells)
-  local widths, minimum, order = {}, {}, {}
+  local wanted, same = {}, self.width_cache and self.width_cache.cells == cells
   for i, spec in ipairs(self.specs) do
-    local wanted = 0
+    local value = 0
     for _, chunks in pairs(entries) do
-      wanted = math.max(wanted, chunks[i].width)
+      value = math.max(value, chunks[i].width)
     end
-    widths[i] = wanted > 0 and math.min(spec.width or wanted, spec.max_width or math.huge) or 0
+    wanted[i] = value
+    same = same and self.width_cache.wanted[i] == value
+  end
+  if same then
+    return self.width_cache.widths
+  end
+  local widths, minimum = {}, {}
+  for i, spec in ipairs(self.specs) do
+    widths[i] = wanted[i] > 0 and math.min(spec.width or wanted[i], spec.max_width or math.huge) or 0
     minimum[i] = math.min(widths[i], spec.min_width)
     if spec.kind == "icon" then
       minimum[i] = widths[i]
     end
-    order[i] = i
   end
-  table.sort(order, function(a, b)
-    if self.specs[a].priority == self.specs[b].priority then
-      return a > b
-    end
-    return self.specs[a].priority < self.specs[b].priority
-  end)
   local function total()
     local sum, count = 0, 0
     for _, width in ipairs(widths) do
@@ -244,12 +256,12 @@ function Row:widths(entries, cells)
     return sum + math.max(0, count - 1)
   end
   local used = total()
-  for _, i in ipairs(order) do
+  for _, i in ipairs(self.order) do
     local remove = math.min(math.max(0, used - cells), widths[i] - minimum[i])
     widths[i] = widths[i] - remove
     used = total()
   end
-  for _, i in ipairs(order) do
+  for _, i in ipairs(self.order) do
     if used <= cells then
       break
     end
@@ -283,7 +295,19 @@ function Row:widths(entries, cells)
       break
     end
   end
+  self.width_cache = { cells = cells, wanted = wanted, widths = widths }
   return widths
+end
+
+-- Retain composed rows for the current viewport only, rather than every entry
+-- visited while browsing a large candidate set.
+function Row:retain(indices, matches)
+  local visible = {}
+  for _, index in pairs(indices) do
+    local entry = matches[index]
+    visible[entry] = self.row_cache[entry]
+  end
+  self.row_cache = visible
 end
 
 local function ranges(chunk, spec, entry, row)
@@ -309,6 +333,18 @@ local function ranges(chunk, spec, entry, row)
 end
 
 function Row:render(entry, widths, prefix, focus, syntax)
+  syntax = self.syntax_code and syntax or nil
+  local cached = self.row_cache[entry]
+  if
+    cached
+    and cached.chunks == entry.component_chunks
+    and cached.widths == widths
+    and cached.prefix == prefix
+    and cached.focus == focus
+    and cached.syntax == syntax
+  then
+    return cached.result
+  end
   local result = { text = prefix, segments = {}, highlights = {} }
   local chunks, present, padding = entry.component_chunks, false, ""
   local function span(first, last, hl, priority)
@@ -336,8 +372,12 @@ function Row:render(entry, widths, prefix, focus, syntax)
           end
         end
       end
-      local label, first, last, leading = text.clip(chunk.text, cells, spec.truncate, hit)
-      local pad = math.max(0, cells - vim.fn.strwidth(label))
+      local label, first, last, leading, label_width = chunk.text, 0, #chunk.text, 0, chunk.width
+      if chunk.width > cells then
+        label, first, last, leading = text.clip(chunk.text, cells, spec.truncate, hit)
+        label_width = vim.fn.strwidth(label)
+      end
+      local pad = math.max(0, cells - label_width)
       if spec.align == "right" then
         result.text = result.text .. string.rep(" ", pad)
       end
@@ -370,6 +410,8 @@ function Row:render(entry, widths, prefix, focus, syntax)
       padding = spec.align == "left" and string.rep(" ", pad) or ""
     end
   end
+  self.row_cache[entry] =
+    { chunks = chunks, widths = widths, prefix = prefix, focus = focus, syntax = syntax, result = result }
   return result
 end
 
