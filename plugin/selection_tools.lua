@@ -3,7 +3,7 @@ if vim.g.loaded_selection_tools then
 end
 vim.g.loaded_selection_tools = true
 
-vim.api.nvim_create_user_command("SelectionTools", function(args)
+require("selection_tools.user_command").create("SelectionTools", function(args)
   local tools = require("selection_tools")
   local name = args.fargs[1] or "files"
   local ok, err = pcall(tools.pick, name)

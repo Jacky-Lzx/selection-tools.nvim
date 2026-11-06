@@ -509,3 +509,10 @@ belong to theme-tools; no extra icon dependency is needed for this integration.
 Without theme-tools, existing standalone defaults remain available.
 Local icon-disable options still apply. Configure shared overrides through
 `require("theme_tools").setup({ icons = { overrides = { ... } } })`.
+
+## Command ownership
+
+Commands belong to the plugin; choose global entry keys and short aliases in
+your configuration. Registration reports same-name conflicts without replacing
+user commands. Reconfiguration refreshes only commands still owned by this
+plugin, and cleanup preserves subsequent user replacements.

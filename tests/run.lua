@@ -1,4 +1,5 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
+dofile("tests/command_ownership.lua")
 vim.o.swapfile = false
 
 local tools = require("selection_tools")
