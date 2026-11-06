@@ -71,7 +71,7 @@ function M.open(picker)
     style = "minimal",
     border = "rounded",
     title = " Item details · q/Esc back · C-y copy ",
-    zindex = 75,
+    zindex = picker.resolved.frame.zindex + 15,
   })
   picker.detail_win = win
   vim.cmd.stopinsert()

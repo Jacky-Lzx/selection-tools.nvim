@@ -119,6 +119,12 @@ function M.open(opts)
   return require("selection_tools.picker").new(vim.tbl_deep_extend("force", {}, config, opts or {}))
 end
 
+---Return the live picker owning a window, including a suspended parent.
+function M.current(win)
+  local picker = package.loaded["selection_tools.picker"]
+  return picker and picker.for_window(win) or nil
+end
+
 ---vim.ui.select-compatible callback; index always refers to the original list.
 ---@param items table
 ---@param opts? table

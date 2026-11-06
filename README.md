@@ -404,6 +404,19 @@ The returned picker provides `set_query(query)`, `set_items(items)`, `move(delta
 
 Sources can extend previews: `preview = { enabled = true }` enables them, and `previewer(ctx)` receives `item`, `index`, `buf`, `win`, `is_cancelled()`, and `set_lines(lines, filetype, title, position)`. `set_lines` supports asynchronous callbacks; the previewer may return a cancellation function. Define additional actions with `actions = { name = function(picker) ... end }` and bind them through `keys.name`.
 
+Open a temporary child with `nested = true` while a picker owns the focused
+window. The parent stays alive with its original buffers, query, selection,
+marks and preview. Closing the child restores the parent window and Insert
+position. Finder deliveries wait until the child closes. Children do not replace
+resume history. Ordinary opens still replace the entire active picker chain;
+closing a parent, disposing the plugin or clicking an editor outside the chain
+also closes its children. `selection.current(win)` returns the live owner of a
+window; omit `win` for the focused window. `picker:owns_window(win)` checks its
+own input, list, preview and details windows.
+
+Picker mappings expose readable `desc` fields. Custom actions can set
+`action_descriptions = { name = "Description" }` alongside `actions` and `keys`.
+
 See `:help selection-tools` for configuration, key bindings, and the full API.
 
 ## Validation
@@ -425,6 +438,7 @@ nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
 nvim --headless -u NONE -n -i NONE -l tests/preview_scroll.lua
 nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
+nvim --headless -u NONE -n -i NONE -l tests/nested.lua
 nvim --headless -u NONE -n -i NONE -l tests/on_change.lua
 nvim --headless -u NONE -n -i NONE -l tests/undo_tree.lua
 # Optional: sibling git-tools.nvim (or GIT_TOOLS_DIR) and delta

@@ -40,14 +40,68 @@ local function clip_cells(text, cells)
   return text .. "…"
 end
 
+function Picker:owns_window(win)
+  return win ~= nil
+    and (win == self.input_win or win == self.list_win or win == self.preview_win or win == self.detail_win)
+end
+
+function Picker.for_window(win)
+  win = win or api.nvim_get_current_win()
+  local picker = active
+  while picker do
+    if not picker.closed and picker:owns_window(win) then
+      return picker
+    end
+    picker = picker.parent
+  end
+end
+
+function Picker:_defer_update(callback)
+  if self.child then
+    self.pending_updates = self.pending_updates or {}
+    self.pending_updates[#self.pending_updates + 1] = callback
+    return true
+  end
+  return false
+end
+
+function Picker:_resume_updates()
+  local updates = self.pending_updates or {}
+  self.pending_updates = nil
+  if #updates > 0 then
+    self.restore_pending = self.child_saved
+    self.resuming = true
+    for _, callback in ipairs(updates) do
+      if self.closed then
+        break
+      end
+      local ok, err = pcall(callback)
+      if not ok then
+        notify(err)
+      end
+    end
+    self.resuming = nil
+  end
+  self.child_saved = nil
+  if not self.closed then
+    self:_apply_restore()
+    self:_render()
+  end
+end
+
 function Picker:_layout()
   self.resolved = require("selection_tools.layout").resolve(self.opts)
+  for _, name in ipairs({ "frame", "input", "list", "preview" }) do
+    if self.resolved[name] then
+      self.resolved[name].zindex = self.resolved[name].zindex + (self.depth or 0) * 20
+    end
+  end
   self.height = self.resolved.height
   return self.resolved
 end
 
 function Picker:_draw_frame()
-  if not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
+  if self.child or not self.frame_buf or not api.nvim_buf_is_valid(self.frame_buf) then
     return
   end
   local title, alignment = require("selection_tools.border_labels").resolve(self, "top", self.opts.prompt or "Select")
@@ -106,6 +160,9 @@ local function scratch(filetype)
 end
 
 function Picker:_draw_separators()
+  if self.child then
+    return
+  end
   -- Native float borders cannot change their side character on individual rows.
   -- Overlay each divider across the sides as well, so the tee joints are continuous.
   local border = api.nvim_win_get_config(self.frame_win).border or {}
@@ -193,7 +250,7 @@ function Picker:_draw_separators()
       col = self.resolved.frame.col,
       width = vim.fn.strdisplaywidth(lines[i]),
       height = 1,
-      zindex = 62,
+      zindex = self.resolved.frame.zindex + 2,
       focusable = false,
       hide = self.mounting == true,
     }
@@ -252,6 +309,7 @@ function Picker:_filter()
     self:_render()
     return
   end
+  local query, generation = self.query, self.generation
   local backend = self.matcher:select(self.query)
   self.matching, self.match_backend = backend == "skim", backend
   if self.matching then
@@ -262,10 +320,18 @@ function Picker:_filter()
     if self.closed then
       return
     end
-    self.matching, self.match_backend = false, used
-    self.matches, self.positions, self.index, self.offset = matches, positions, 1, 0
-    self:_apply_restore()
-    self:_render()
+    local function publish()
+      if self.closed or self.query ~= query or self.generation ~= generation then
+        return
+      end
+      self.matching, self.match_backend = false, used
+      self.matches, self.positions, self.index, self.offset = matches, positions, 1, 0
+      self:_apply_restore()
+      self:_render()
+    end
+    if not self:_defer_update(publish) then
+      publish()
+    end
   end)
 end
 
@@ -371,7 +437,7 @@ function Picker:_syntax(entry)
 end
 
 function Picker:_render()
-  if self.closed or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
+  if self.closed or self.child or self.resuming or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
     return
   end
   -- A completed syntax job must not publish a superseded, never-displayed list.
@@ -596,6 +662,13 @@ function Picker:_find()
   local function current()
     return not self.closed and self.generation == generation
   end
+  local function deliver(callback)
+    vim.schedule(function()
+      if current() and not self:_defer_update(callback) then
+        callback()
+      end
+    end)
+  end
   local ctx = {
     query = self.query,
     cwd = self.opts.cwd or vim.fn.getcwd(),
@@ -606,7 +679,7 @@ function Picker:_find()
   }
   -- Scheduled delivery makes these safe from vim.system/libuv callbacks.
   ctx.set_items = function(items)
-    vim.schedule(function()
+    deliver(function()
       if current() then
         if self.finder_pending and type(items) == "table" and #items == 0 then
           return
@@ -620,7 +693,7 @@ function Picker:_find()
     end)
   end
   ctx.append_items = function(items)
-    vim.schedule(function()
+    deliver(function()
       if not current() then
         return
       end
@@ -658,7 +731,7 @@ function Picker:_find()
     end)
   end
   ctx.done = function(status)
-    vim.schedule(function()
+    deliver(function()
       if current() then
         self.loading = false
         self.truncated = status and status.truncated
@@ -672,7 +745,7 @@ function Picker:_find()
     end)
   end
   ctx.fail = function(err)
-    vim.schedule(function()
+    deliver(function()
       if current() then
         self.loading, self.error = false, tostring(err)
         if self.finder_pending then
@@ -699,7 +772,14 @@ end
 ---Replace the current candidate list, preserving original item values.
 function Picker:set_items(items)
   if not self.closed then
-    self:_set_items(items)
+    local function publish()
+      if not self.closed then
+        self:_set_items(items)
+      end
+    end
+    if not self:_defer_update(publish) then
+      publish()
+    end
   end
 end
 
@@ -934,8 +1014,12 @@ function Picker:close(item, index, selected, outcome)
   if self.closed then
     return
   end
-  require("selection_tools.state").remember(self)
   self.closed = true
+  self.pending_updates, self.child_saved = nil, nil
+  if self.child then
+    self.child:close(nil, nil, nil, { reason = "parent_closed" })
+  end
+  require("selection_tools.state").remember(self)
   self.confirmation = nil
   outcome = outcome or { reason = index and "confirm" or "cancel" }
   self.matching = false
@@ -983,8 +1067,34 @@ function Picker:close(item, index, selected, outcome)
   if owns_focus and api.nvim_win_is_valid(self.origin_win) then
     api.nvim_set_current_win(self.origin_win)
   end
+  local parent = self.parent
+  if parent and parent.child == self then
+    parent.child = nil
+  end
   if active == self then
-    active = nil
+    active = parent and not parent.closed and parent or nil
+  end
+  if parent and not parent.closed then
+    parent:_resume_updates()
+    local saved = self.return_state
+    if owns_focus and saved then
+      vim.schedule(function()
+        if
+          parent.closed
+          or active ~= parent
+          or api.nvim_get_current_win() ~= saved.win
+          or not api.nvim_win_is_valid(saved.win)
+          or api.nvim_win_get_buf(saved.win) ~= saved.buf
+        then
+          return
+        end
+        api.nvim_win_set_cursor(saved.win, saved.cursor)
+        if saved.mode:sub(1, 1) == "i" then
+          local line = api.nvim_buf_get_lines(saved.buf, saved.cursor[1] - 1, saved.cursor[1], false)[1]
+          vim.cmd.startinsert({ bang = saved.cursor[2] >= #line })
+        end
+      end)
+    end
   end
   if self.opts.on_close then
     local ok, err = pcall(self.opts.on_close, self, outcome)
@@ -1081,19 +1191,23 @@ function Picker:_events()
     callback = function()
       vim.schedule(function()
         local win = api.nvim_get_current_win()
-        if
-          not self.closed
-          and not self.prompting
-          and win ~= self.input_win
-          and win ~= self.list_win
-          and win ~= self.preview_win
-          and win ~= self.detail_win
-        then
-          -- Focus has already left the picker, so close() will preserve the
-          -- destination window. End the picker's Insert mode there as well.
-          vim.cmd.stopinsert()
-          self:close()
+        if self.closed or self.child or self.prompting or self:owns_window(win) then
+          return
         end
+        vim.cmd.stopinsert()
+        local ancestor = self.parent
+        while ancestor do
+          if ancestor:owns_window(win) then
+            ancestor.child:close(nil, nil, nil, { reason = "focus" })
+            return
+          end
+          ancestor = ancestor.parent
+        end
+        local root = self
+        while root.parent do
+          root = root.parent
+        end
+        root:close(nil, nil, nil, { reason = "outside" })
       end)
     end,
   })
@@ -1204,21 +1318,59 @@ function Picker:_events()
       action(self)
     end
   end
+  local descriptions = {
+    confirm = "Confirm selection",
+    close = "Close picker",
+    next = "Next result",
+    previous = "Previous result",
+    select_previous = "Toggle selection and move to previous result",
+    select_next = "Toggle selection and move to next result",
+    history_back = "Previous search history",
+    history_forward = "Next search history",
+    preview_up = "Scroll preview up",
+    preview_down = "Scroll preview down",
+    list_up = "Scroll results up",
+    list_down = "Scroll results down",
+    copy = "Copy selection",
+    system_open = "Open selection with system application",
+    split = "Open selection in horizontal split",
+    vsplit = "Open selection in vertical split",
+    tab = "Open selection in new tab",
+    quickfix = "Send selection to quickfix",
+    quickfix_all = "Send all results to quickfix",
+    loclist = "Send selection to location list",
+    loclist_all = "Send all results to location list",
+    search_regex = "Toggle regular expression search",
+    search_case = "Change search case sensitivity",
+    search_hidden = "Toggle hidden files",
+    search_ignored = "Toggle ignored files",
+    search_scope = "Change search directory",
+    search_globs = "Change search file globs",
+    preview_expand = "Expand or restore preview",
+    details = "Show result details",
+    ignore = "Ignore key",
+  }
   require("selection_tools.mouse").setup(self)
   for action, keys in pairs(self.opts.keys) do
     assert(actions[action], "selection-tools: unknown key action: " .. action)
     for _, key in ipairs(keys) do
       for _, buf in ipairs({ self.input_buf, self.list_buf, self.preview_buf }) do
-        vim.keymap.set({ "i", "n" }, key, actions[action], { buffer = buf, nowait = true, silent = true })
+        local desc = (self.opts.action_descriptions or {})[action] or descriptions[action] or action:gsub("_", " ")
+        vim.keymap.set({ "i", "n" }, key, actions[action], {
+          buffer = buf,
+          nowait = true,
+          silent = true,
+          desc = "[Picker] " .. desc,
+        })
       end
     end
   end
-  vim.keymap.set("n", "j", actions.next, { buffer = self.list_buf })
-  vim.keymap.set("n", "k", actions.previous, { buffer = self.list_buf })
+  vim.keymap.set("n", "j", actions.next, { buffer = self.list_buf, desc = "[Picker] Next result" })
+  vim.keymap.set("n", "k", actions.previous, { buffer = self.list_buf, desc = "[Picker] Previous result" })
   vim.keymap.set("n", "/", function()
     api.nvim_set_current_win(self.input_win)
     vim.cmd.startinsert({ bang = true })
-  end, { buffer = self.list_buf })
+  end, { buffer = self.list_buf, desc = "[Picker] Edit search query" })
 end
 
 function Picker:_setup_highlights()
@@ -1325,6 +1477,19 @@ function Picker:_mount(resolved)
 end
 
 function Picker.new(opts)
+  assert(opts.nested == nil or type(opts.nested) == "boolean", "selection-tools: nested must be boolean")
+  local parent = opts.nested and Picker.for_window() or nil
+  assert(
+    not opts.nested or parent == active and parent ~= nil,
+    "selection-tools: nested picker needs a focused active parent"
+  )
+  assert(
+    opts.action_descriptions == nil or type(opts.action_descriptions) == "table",
+    "selection-tools: action_descriptions must be a table"
+  )
+  for _, desc in pairs(opts.action_descriptions or {}) do
+    assert(type(desc) == "string", "selection-tools: action descriptions must be strings")
+  end
   assert(opts.on_change == nil or type(opts.on_change) == "function", "selection-tools: on_change must be a function")
   assert(
     opts.before_confirm == nil or type(opts.before_confirm) == "function",
@@ -1341,6 +1506,8 @@ function Picker.new(opts)
   assert(type(opts.items) == "table" or type(opts.finder) == "function", "selection-tools: supply items or finder")
   local self = setmetatable({
     opts = opts,
+    parent = parent,
+    depth = parent and parent.depth + 1 or 0,
     closed = false,
     query = tostring(opts.query or ""):gsub("[\r\n]", " "),
     entries = {},
@@ -1358,8 +1525,36 @@ function Picker.new(opts)
   if opts.items then
     self:_set_items(opts.items)
   end
-  if active then
-    active:close()
+  if parent then
+    local win = api.nvim_get_current_win()
+    self.return_state = {
+      win = win,
+      buf = api.nvim_win_get_buf(win),
+      cursor = api.nvim_win_get_cursor(win),
+      mode = api.nvim_get_mode().mode,
+    }
+    local state = require("selection_tools.state")
+    local entry = parent.matches[parent.index]
+    local marked_keys = {}
+    for _, candidate in ipairs(parent.entries) do
+      if parent.marks[candidate.index] then
+        marked_keys[state.key(candidate)] = true
+      end
+    end
+    parent.child_saved = {
+      refreshed = true,
+      key = entry and state.key(entry),
+      marked_keys = marked_keys,
+      offset = parent.offset,
+      view = parent.preview_win and api.nvim_win_call(parent.preview_win, vim.fn.winsaveview) or nil,
+    }
+    parent.child = self
+  elseif active then
+    local root = active
+    while root.parent do
+      root = root.parent
+    end
+    root:close()
   end
   self.history_key = opts.source or opts.kind or opts.prompt or "select"
   self.history = require("selection_tools.history").get(self.history_key, opts.history)
@@ -1377,7 +1572,11 @@ end
 
 function Picker.dispose()
   if active then
-    active:close(nil, nil, nil, { reason = "dispose" })
+    local root = active
+    while root.parent do
+      root = root.parent
+    end
+    root:close(nil, nil, nil, { reason = "dispose" })
   end
 end
 

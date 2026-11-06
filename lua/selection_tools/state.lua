@@ -14,7 +14,7 @@ function M.key(entry)
 end
 
 function M.remember(picker)
-  if not picker.started or picker.opts.resume == false then
+  if not picker.started or picker.parent or picker.opts.resume == false then
     return
   end
   local items, marked_keys = {}, {}

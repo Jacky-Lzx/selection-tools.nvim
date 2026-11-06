@@ -114,7 +114,7 @@ function Scroll:update()
     style = "minimal",
     border = "none",
     focusable = false,
-    zindex = 63,
+    zindex = p.resolved.frame.zindex + 3,
     hide = p.mounting == true,
   }
   if self.win and api.nvim_win_is_valid(self.win) then

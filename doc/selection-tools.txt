@@ -621,4 +621,20 @@ an incomplete preview. preview_item results accept these fields as well.
 ctx.picker provides the owner. Preview providers otherwise keep the existing
 close/resize/retain protocol.
 
+NESTED PICKERS                                          *selection-tools-nested*
+
+Pass nested=true to open()/select() from a focused picker window. This creates
+an owned child and retains the parent's buffers, query, marks and preview.
+Child close restores the parent focus/mode/cursor; background finder deliveries
+wait for return. Children never replace resume history. A normal open replaces
+the entire chain. Parent closure and dispose close all descendants. Outside
+editor clicks dismiss the chain without restoring its focus.
+
+selection.current(win) returns the live picker owning that window (including a
+suspended parent); omitted win uses the current window. Returns nil otherwise.
+picker:owns_window(win) tests only that picker's own windows.
+
+action_descriptions={name="Description"} supplies descriptions for custom actions
+or overrides built-in labels. All configured action mappings expose desc.
+
 vim:tw=78:ts=8:ft=help:norl:

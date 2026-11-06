@@ -1111,6 +1111,8 @@ else
   print("SKIP real skim integration tests (sk not installed)")
 end
 
+dofile("tests/nested.lua")
+
 vim.fn.delete(fixture, "rf")
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then
