@@ -90,11 +90,11 @@ function M.open(picker)
   for _, key in ipairs({ "q", "<Esc>", "<F2>" }) do
     vim.keymap.set("n", key, function()
       M.close(picker, true)
-    end, { buffer = buf, silent = true, nowait = true })
+    end, { buffer = buf, silent = true, nowait = true, desc = "[Picker] Close details and return to search" })
   end
   vim.keymap.set("n", "<C-y>", function()
     vim.fn.setreg("+", content)
-  end, { buffer = buf, silent = true })
+  end, { buffer = buf, silent = true, desc = "[Picker] Copy result details" })
   api.nvim_create_autocmd("WinClosed", {
     pattern = tostring(win),
     once = true,

@@ -101,6 +101,14 @@ function M.setup(picker)
     ["<ScrollWheelUp>"] = "up",
     ["<ScrollWheelDown>"] = "down",
   }
+  local descriptions = {
+    select = "Select result or position input cursor",
+    confirm = "Confirm result under mouse",
+    toggle = "Toggle result selection under mouse",
+    release = "Finish mouse selection",
+    up = "Scroll results or preview up",
+    down = "Scroll results or preview down",
+  }
   -- Clicks and scrolling retain the search focus, including when a provider
   -- displays a caller-owned or terminal buffer in the preview pane.
   for _, buf in ipairs({ picker.input_buf, picker.list_buf, picker.preview_buf }) do
@@ -110,7 +118,7 @@ function M.setup(picker)
         if fallback ~= "" then
           api.nvim_feedkeys(api.nvim_replace_termcodes(fallback, true, false, true), "in", false)
         end
-      end, { buffer = buf, silent = true, nowait = true })
+      end, { buffer = buf, silent = true, nowait = true, desc = "[Picker] " .. descriptions[action] })
     end
   end
 end
