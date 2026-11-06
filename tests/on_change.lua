@@ -40,7 +40,13 @@ assert(not picker.closed and notices[#notices]:find("bad change callback", 1, tr
 picker:move(1)
 assert(picker:current() == "two")
 vim.cmd.colorscheme("morning")
-assert(api.nvim_get_hl(0, { name = "SelectionToolsSelected" }).link == "Visual")
+assert(
+  vim.deep_equal(
+    api.nvim_get_hl(0, { name = "SelectionToolsSelected", link = false }),
+    api.nvim_get_hl(0, { name = "Visual", link = false })
+  ),
+  "selected-row colors should follow Visual after a colorscheme change"
+)
 picker:close()
 -- Pending matching must not expose a selection that has not been published.
 local done
