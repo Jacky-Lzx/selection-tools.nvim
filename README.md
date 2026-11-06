@@ -486,7 +486,7 @@ Tests cover object/index preservation, cancellation and lifecycle, stale asynchr
 
 - `autocmds()`: searches events, groups, patterns, and descriptions, and previews full definitions. Confirmation locates the Lua definition or opens read-only details.
 
-- `keymaps()`: searches global and buffer-local mappings across modes and previews definitions. Confirmation uses Normal mode key replay following Snacks behavior; set `action="definition"` to locate the definition instead.
+- `keymaps()`: searches global and buffer-local mappings across modes and previews definitions. Confirmation locates the definition without executing the mapping. Use keymap-tools.nvim for mode-aware keymap execution.
 
 - `help()`: searches runtime help tags, previews their locations, and opens native help on confirmation. Tag files are read asynchronously and parsed in batches after the window appears. Cache invalidation follows tag-file metadata and runtime order.
 

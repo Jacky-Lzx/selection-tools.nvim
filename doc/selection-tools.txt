@@ -552,8 +552,8 @@ picker gets a fresh index.
                    Confirm jumps to Lua source or opens read-only details.
   keymaps          Global and buffer-local mappings, all modes. Local mappings
                    take precedence. modes={...}, global=false, ['local']=false,
-                   plugs=true adjust inclusion. Confirm replays keys in Normal
-                   mode, matching Snacks. action='definition' navigates instead.
+                   plugs=true adjust inclusion. Confirm locates the definition without executing keys.
+                   Use keymap-tools.nvim for mode-aware execution.
   help             Runtime doc/tags search, positioned preview, native :help.
                    Deferred async reads and cancellable batched parsing. File
                    metadata and runtime order invalidate the in-memory index;

@@ -14,7 +14,7 @@ return function(opts)
     item.detail, item.ft = vim.inspect(map), "lua"
   end
   return {
-    prompt = "Keymaps",
+    prompt = "Keymap definitions",
     finder = function(ctx)
       return util.collect(ctx, function(checkpoint)
         local maps = {}
@@ -56,17 +56,11 @@ return function(opts)
         return
       end
       util.context(origin, function()
-        if opts.action == "definition" then
-          describe(item)
-          if item.file then
-            util.jump(item)
-          else
-            util.show(item)
-          end
+        describe(item)
+        if item.file then
+          util.jump(item)
         else
-          -- Match the previous Snacks action: replay the selected keys in Normal mode.
-          local keys = vim.api.nvim_replace_termcodes(item.lhs, true, false, true)
-          vim.api.nvim_feedkeys(keys, "mt", false)
+          util.show(item)
         end
       end)
     end,

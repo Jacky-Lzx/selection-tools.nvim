@@ -87,17 +87,16 @@ test("keymap definitions are resolved only for preview or explicit definition na
     eq(calls, 0)
     p:confirm()
     vim.api.nvim_feedkeys("", "x", false)
-    eq(calls, 0)
+    eq(calls, 1)
     p = tools.keymaps({
       modes = { "n" },
       query = "selection_lazy_mapping",
       preview = { enabled = false },
-      action = "definition",
     })
     ready(p)
-    eq(calls, 0)
-    p:confirm()
     eq(calls, 1)
+    p:confirm()
+    eq(calls, 2)
   end, debug.traceback)
   util.definition = original
   vim.keymap.del("n", "<F7>")
