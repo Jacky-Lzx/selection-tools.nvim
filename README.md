@@ -400,6 +400,10 @@ local picker = require("selection_tools").open({
 
 Sources can return `{{start_byte, end_byte}, ...}` from `highlight_item(item, original_index)` to highlight ranges of formatted items with `SelectionToolsMatch`. Ranges use zero-based, end-exclusive byte offsets into the original string returned by `format_item`; the renderer handles display transformations for icons, selection marks, tabs, and other control characters. The callback runs only for visible candidates, with results cached until candidates are replaced. Grep uses ripgrep's actual match ranges without reinterpreting regexes or applying fuzzy matching.
 
+`match_priority(item, original_index)` can return a finite numeric priority for
+stable groups: lower values appear first, with matcher relevance retained within
+each group. Original item indices and query highlights are preserved.
+
 The returned picker provides `set_query(query)`, `set_items(items)`, `move(delta)`, `current()`, `confirm()`, and `close()`. `current()` returns the current item and its original index; `close()` cancels.
 
 Sources can extend previews: `preview = { enabled = true }` enables them, and `previewer(ctx)` receives `item`, `index`, `buf`, `win`, `is_cancelled()`, and `set_lines(lines, filetype, title, position)`. `set_lines` supports asynchronous callbacks; the previewer may return a cancellation function. Define additional actions with `actions = { name = function(picker) ... end }` and bind them through `keys.name`.

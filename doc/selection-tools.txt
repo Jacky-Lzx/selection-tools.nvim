@@ -621,6 +621,12 @@ an incomplete preview. preview_item results accept these fields as well.
 ctx.picker provides the owner. Preview providers otherwise keep the existing
 close/resize/retain protocol.
 
+MATCH PRIORITY                                         *selection-tools-match-priority*
+
+match_priority(item, original_index) optionally returns a finite number. Lower
+priorities appear first; ties preserve matcher relevance order. Original item
+indices and match highlights remain aligned, for native and async matchers.
+
 NESTED PICKERS                                          *selection-tools-nested*
 
 Pass nested=true to open()/select() from a focused picker window. This creates

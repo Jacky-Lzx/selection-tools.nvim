@@ -297,6 +297,30 @@ function Picker:_set_items(items)
   end
 end
 
+-- Stable priority groups retain each matcher's relevance order and positions.
+function Picker:_rank_matches(matches, positions)
+  if not self.opts.match_priority then
+    return matches, positions
+  end
+  local ranked = {}
+  for index, entry in ipairs(matches) do
+    local priority = self.opts.match_priority(entry.item, entry.index)
+    assert(
+      type(priority) == "number" and priority == priority and math.abs(priority) < math.huge,
+      "selection-tools: match_priority must return a finite number"
+    )
+    ranked[index] = { entry = entry, priority = priority, order = index }
+  end
+  table.sort(ranked, function(a, b)
+    return a.priority < b.priority or a.priority == b.priority and a.order < b.order
+  end)
+  local ordered, highlights = {}, {}
+  for index, value in ipairs(ranked) do
+    ordered[index], highlights[index] = value.entry, positions[value.order]
+  end
+  return ordered, highlights
+end
+
 function Picker:_filter()
   if self.closed then
     return
@@ -305,7 +329,7 @@ function Picker:_filter()
     self.matcher:cancel()
     self.matching, self.match_backend = false, "none"
     self.positions, self.index, self.offset = {}, 1, 0
-    self.matches = self.entries
+    self.matches, self.positions = self:_rank_matches(self.entries, {})
     self:_render()
     return
   end
@@ -324,8 +348,9 @@ function Picker:_filter()
       if self.closed or self.query ~= query or self.generation ~= generation then
         return
       end
+      local ordered, highlights = self:_rank_matches(matches, positions)
       self.matching, self.match_backend = false, used
-      self.matches, self.positions, self.index, self.offset = matches, positions, 1, 0
+      self.matches, self.positions, self.index, self.offset = ordered, highlights, 1, 0
       self:_apply_restore()
       self:_render()
     end
@@ -719,7 +744,7 @@ function Picker:_find()
         end
         self.matcher:set_entries(self.entries)
         if self.opts.match == false then
-          self.matches = self.entries
+          self.matches, self.positions = self:_rank_matches(self.entries, {})
           self:_render()
         else
           self:_filter()
@@ -1490,6 +1515,10 @@ function Picker.new(opts)
   for _, desc in pairs(opts.action_descriptions or {}) do
     assert(type(desc) == "string", "selection-tools: action descriptions must be strings")
   end
+  assert(
+    opts.match_priority == nil or type(opts.match_priority) == "function",
+    "selection-tools: match_priority must be a function"
+  )
   assert(opts.on_change == nil or type(opts.on_change) == "function", "selection-tools: on_change must be a function")
   assert(
     opts.before_confirm == nil or type(opts.before_confirm) == "function",

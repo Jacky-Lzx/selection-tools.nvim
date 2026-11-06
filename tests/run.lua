@@ -1112,6 +1112,7 @@ else
 end
 
 dofile("tests/nested.lua")
+dofile("tests/match_priority.lua")
 
 vim.fn.delete(fixture, "rf")
 print(("\n%d passed, %d failed"):format(passed, failed))
