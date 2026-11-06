@@ -273,20 +273,26 @@ function Picker:_draw_separators()
   end
 end
 
+function Picker:_entry(item, index)
+  if self.components then
+    return self.components:entry(item, index)
+  end
+  local raw = tostring(self.opts.format_item and self.opts.format_item(item) or item)
+  local display = single_line(raw)
+  return {
+    item = item,
+    index = index,
+    text = display,
+    raw_text = (self.opts.highlight_item or self.opts.syntax.enabled) and raw ~= display and raw or nil,
+  }
+end
+
 function Picker:_set_items(items)
   self.confirmation = nil
   assert(type(items) == "table", "finder results must be a list")
   local entries = {}
   for index, item in ipairs(items) do
-    local text = self.opts.format_item and self.opts.format_item(item) or tostring(item)
-    local raw = tostring(text)
-    local display = single_line(raw)
-    entries[index] = {
-      item = item,
-      index = index,
-      text = display,
-      raw_text = (self.opts.highlight_item or self.opts.syntax.enabled) and raw ~= display and raw or nil,
-    }
+    entries[index] = self:_entry(item, index)
   end
   self.entries, self.marks = entries, {}
   self.matcher:set_entries(entries)
@@ -361,6 +367,9 @@ function Picker:_filter()
 end
 
 function Picker:_icon(entry)
+  if self.components and not self.components.automatic_icon then
+    return
+  end
   local config = self.opts.item_icons
   if config == false or (type(config) == "table" and config.enabled == false) then
     return
@@ -432,6 +441,9 @@ function Picker:_highlights(entry)
 end
 
 function Picker:_syntax(entry)
+  if self.components and not self.components.syntax_code then
+    return {}
+  end
   local item = entry.item
   if
     not self.opts.syntax.enabled
@@ -439,7 +451,7 @@ function Picker:_syntax(entry)
     or not item.file
     or not item.pos
     or not item.code
-    or not item.content_offset
+    or not (self.components or item.content_offset)
   then
     return {}
   end
@@ -449,6 +461,9 @@ function Picker:_syntax(entry)
   local spans = self.syntax:highlights(item)
   if not spans then
     return
+  end
+  if self.components then
+    return spans
   end
   if entry.syntax_source ~= spans then
     local ranges = {}
@@ -485,8 +500,10 @@ function Picker:_render()
   local show_marks = self.opts.multi and next(self.marks) ~= nil
   local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
   local icons, icon_width, rows = {}, 0, {}
-  local columns = self.opts.result_layout == "grep" and require("selection_tools.grep_row") or nil
-  local undo = self.opts.result_layout == "undo" and require("selection_tools.undo_row") or nil
+  local columns = not self.components and self.opts.result_layout == "grep" and require("selection_tools.grep_row")
+    or nil
+  local undo = not self.components and self.opts.result_layout == "undo" and require("selection_tools.undo_row") or nil
+  local component_chunks = {}
   local wanted_file, wanted_position = 0, 0
   if reverse and count > 0 then
     for row = 1, self.height do
@@ -504,6 +521,9 @@ function Picker:_render()
       icons[row] = icon
       icon_width = math.max(icon_width, vim.fn.strdisplaywidth(icon.text))
     end
+    if self.components then
+      component_chunks[row] = self.components:prepare(entry, icon)
+    end
     if columns then
       local info = columns.info(entry)
       wanted_file = math.max(wanted_file, info.file_width)
@@ -516,12 +536,20 @@ function Picker:_render()
     return
   end
   self.row_to_index = row_to_index
+  local component_prefix = not show_marks
+      and self.components
+      and self.components.automatic_icon
+      and icon_width > 0
+      and " "
+    or ""
+  local component_widths = self.components
+    and self.components:widths(component_chunks, math.max(0, self.resolved.width - mark_width - #component_prefix))
   wanted_file = wanted_file + 2 + wanted_position + (icon_width > 0 and icon_width + 1 or 0)
   local file_cells = columns and columns.file_width(self.resolved.width - mark_width, wanted_file) or 0
   for row, index in pairs(self.row_to_index) do
     local entry = self.matches[index]
     local prefix = show_marks and ((self.marks[entry.index] and "●" or "○") .. " │ ") or ""
-    if columns then
+    if columns or self.components then
       local focus = vim.tbl_filter(function(range)
         return range.hl == nil or range.hl == "SelectionToolsMatch"
       end, self:_highlights(entry))
@@ -533,8 +561,12 @@ function Picker:_render()
           focus[#focus + 1] = { vim.fn.byteidx(entry.text, pos), vim.fn.byteidx(entry.text, pos + 1) }
         end
       end
-      rows[row] =
-        columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width, wanted_position)
+      if self.components then
+        rows[row] = self.components:render(entry, component_widths, prefix .. component_prefix, focus, syntax[row])
+      else
+        rows[row] =
+          columns.render(entry, self.resolved.width, file_cells, prefix, icons[row], focus, icon_width, wanted_position)
+      end
     elseif undo then
       rows[row] = undo.render(entry, self.resolved.width, prefix, reverse)
     else
@@ -591,6 +623,13 @@ function Picker:_render()
         end
       end
       local icon = display.icon
+      for _, range in ipairs(display.highlights or {}) do
+        api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, range[1], {
+          end_col = range[2],
+          hl_group = range.hl,
+          priority = range.priority,
+        })
+      end
       if icon then
         api.nvim_buf_set_extmark(self.list_buf, ns, row - 1, icon.first, {
           end_col = icon.last,
@@ -610,7 +649,7 @@ function Picker:_render()
         self.positions[index] = vim.fn.matchfuzzypos({ self.matches[index].text }, self.query, { matchseq = 1 })[2][1]
           or {}
       end
-      for _, span in ipairs(syntax[row]) do
+      for _, span in ipairs(not self.components and syntax[row] or {}) do
         highlight(span[1], span[2], span.hl, span.priority)
       end
       for _, range in ipairs(self:_highlights(self.matches[index])) do
@@ -733,14 +772,7 @@ function Picker:_find()
           return
         end
         for _, item in ipairs(items) do
-          local raw = tostring(self.opts.format_item and self.opts.format_item(item) or item)
-          local display = single_line(raw)
-          self.entries[#self.entries + 1] = {
-            item = item,
-            index = #self.entries + 1,
-            text = display,
-            raw_text = (self.opts.highlight_item or self.opts.syntax.enabled) and raw ~= display and raw or nil,
-          }
+          self.entries[#self.entries + 1] = self:_entry(item, #self.entries + 1)
         end
         self.matcher:set_entries(self.entries)
         if self.opts.match == false then
@@ -1417,6 +1449,18 @@ function Picker:_setup_highlights()
   default_highlight("SelectionToolsCount", count_hl)
   default_highlight("SelectionToolsFileIcon", { link = "Comment" })
   default_highlight("SelectionToolsDirectoryIcon", { link = "Directory" })
+  if self.components then
+    -- A NormalFloat background would cover the selected-row background.
+    local normal = api.nvim_get_hl(0, { name = "NormalFloat", link = false })
+    local fallback_normal = api.nvim_get_hl(0, { name = "Normal", link = false })
+    default_highlight("SelectionToolsText", {
+      fg = normal.fg or fallback_normal.fg,
+      ctermfg = normal.ctermfg or fallback_normal.ctermfg,
+    })
+    for name, link in pairs({ Path = "Directory", Position = "Comment", Time = "Number" }) do
+      default_highlight("SelectionTools" .. name, { link = link })
+    end
+  end
   local file_color = api.nvim_get_hl(0, { name = "Comment", link = false })
   default_highlight("SelectionToolsFileLocation", {
     fg = file_color.fg,
@@ -1502,6 +1546,16 @@ function Picker:_mount(resolved)
 end
 
 function Picker.new(opts)
+  assert(
+    opts.components == nil or opts.components == false or type(opts.components) == "table",
+    "selection-tools: components must be a list or false"
+  )
+  assert(
+    opts.match_text == nil or type(opts.match_text) == "function",
+    "selection-tools: match_text must be a function"
+  )
+  assert(not opts.match_text or opts.components, "selection-tools: match_text requires components")
+  local components = opts.components and require("selection_tools.component_row").new(opts)
   assert(opts.nested == nil or type(opts.nested) == "boolean", "selection-tools: nested must be boolean")
   local parent = opts.nested and Picker.for_window() or nil
   assert(
@@ -1535,6 +1589,7 @@ function Picker.new(opts)
   assert(type(opts.items) == "table" or type(opts.finder) == "function", "selection-tools: supply items or finder")
   local self = setmetatable({
     opts = opts,
+    components = components,
     parent = parent,
     depth = parent and parent.depth + 1 or 0,
     closed = false,

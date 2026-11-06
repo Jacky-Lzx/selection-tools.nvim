@@ -48,6 +48,8 @@ def run_case(case):
                            scope_value=b"\x15" + (directory + "/sub").encode() + b"\r", export=b"\x11", expand=b"\x1bOR", collapse=b"\x1bOR", details=b"\x1bOQ", details_close=b"q", split=b"\x16")
         if case == "grep_columns_tui":
             actions.update(type=b"needle", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
+        if case == "components_tui":
+            actions.update(type=b"needle", select=b"\t", resize_narrow=b"", resize_tiny=b"", resize_wide=b"")
         if case == "grep_tui":
             actions.update(type=b"hel")
         if case == "live_tui":
@@ -90,7 +92,7 @@ def run_case(case):
                 stage_file = Path(directory, "stage")
                 stage = stage_file.read_text().strip() if stage_file.exists() else ""
                 if stage in actions and stage not in handled:
-                    if case in {"grep_columns_tui", "undo_tui", "delta_preview_tui", "preview_scroll_tui"} and stage.startswith("resize_"):
+                    if case in {"components_tui", "grep_columns_tui", "undo_tui", "delta_preview_tui", "preview_scroll_tui"} and stage.startswith("resize_"):
                         columns = {"resize_narrow": 48, "resize_tiny": 16, "resize_wide": 120}[stage]
                         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 30, columns, 0, 0))
                         os.kill(process.pid, signal.SIGWINCH)
@@ -126,6 +128,7 @@ def run_case(case):
 
 
 if __name__ == "__main__":
+    run_case("components_tui")
     run_case("opening_tui")
     run_case("tui")
     run_case("mouse_tui")

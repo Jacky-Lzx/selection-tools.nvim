@@ -348,6 +348,108 @@ Marking the first item reveals a selection column on the left: `○ │ item` is
 
 Unmarked circles and separators use the theme's `Comment` gray; marked circles use the `Special` accent. Override them with `SelectionToolsUnmarked`, `SelectionToolsMarkSeparator`, and `SelectionToolsMarked`, respectively. When the selection column is hidden, one cell of padding remains to the left of icons.
 
+### Composing result rows
+
+Use `components` in `open()`, `select()`, or a registered source to share formatting,
+styles, and column sizing. Descriptors can be reused across pickers; original
+items still reach preview and confirmation callbacks unchanged.
+
+```lua
+local selection = require("selection_tools")
+local C = require("selection_tools.components")
+
+selection.setup({
+  component_defaults = {
+    path = { hl = "Directory" }, -- Defaults for every path component
+    time = { format = "%H:%M", hl = "Comment" },
+  },
+})
+
+selection.open({
+  items = results,
+  components = {
+    C.icon(),
+    C.path({ max_width = 30, grow = 0 }),
+    C.position({ align = "right" }),
+    C.text({ field = "message", grow = 1, truncate = "match" }),
+    C.time(),
+    -- A custom component uses the same sizing and highlight machinery.
+    C.text({
+      get = function(item) return item.cached and "cached" or nil end,
+      searchable = false,
+      hl = "Comment",
+    }),
+  },
+  on_choice = function(item) print(item.file) end,
+})
+```
+
+| Component | Default input | Default style | Searchable |
+| --- | --- | --- | --- |
+| `C.text()` | `item.text`, or a scalar item | `SelectionToolsText` (normal foreground) | Yes |
+| `C.path()` | `item.file` | `SelectionToolsPath` → `Directory` | Yes |
+| `C.position()` | `item.pos = { row, zero_based_column }` | `SelectionToolsPosition` → `Comment` | Yes |
+| `C.time()` | `item.timestamp` (Unix seconds or a preformatted string) | `SelectionToolsTime` → `Number` | No |
+| `C.icon()` | Existing file/directory icon provider | Provider's highlight group | No |
+
+`field` maps a component to another item field; `get(item, original_index)` takes
+precedence when supplied. Nil and empty strings omit the component and its gap.
+`false` is displayed as text. Paths default to `path_format = ":~:."`; use `false`
+to preserve an already formatted path. Positions display one-based columns. Times
+default to `format = "%Y-%m-%d %H:%M:%S"` in the local timezone. Icon components
+honor `item_icons`, `format_icon`, and the shared icon mode; their values cannot
+be overridden with `field`/`get`, and they never participate in matching.
+
+Options resolve from built-in defaults, then `component_defaults[kind]` (global
+and per picker), then the descriptor. Use `hl = false` to inherit the row's color.
+Public highlight groups remain theme/user-owned and can be overridden normally.
+
+Columns measure only visible candidates, using terminal display cells. Options:
+
+- `width`: preferred width; `max_width`: cap; `min_width`: minimum before hiding.
+- `grow`: share of spare space (default 0, or 1 for paths).
+- `align`: `"left"` or `"right"` within the column.
+- `truncate`: `"right"`, `"left"` (paths), or `"match"` to retain query context.
+- `priority`: lower values shrink/hide first: icon 10, time 40, position 50,
+  path 80, text 100. Equal priorities prefer retaining earlier columns.
+
+Nonempty columns have one cell between them. Widths are preferred allocations;
+lower-priority columns shrink to their minima, then disappear if necessary.
+Minima are bounded by the available content. Truncation preserves composed UTF-8
+characters, and hidden/truncated content remains searchable.
+
+Search uses the complete values of `searchable = true` components, in descriptor
+order, joined with a single space. Controls are escaped independently of display
+padding and clipping.
+Changing width, styles, icons, or selection marks never changes the search text.
+Query highlights map back to visible component fragments. Override with
+`match_text(item, original_index)` to search aliases or hidden metadata; with
+this override there is no inferred query-to-display mapping, so automatic query
+highlights are omitted. Component-local highlights remain available.
+
+Custom `highlights(item, original_index)` returns ranges such as
+`{ { 0, 4, hl = "Function", priority = 100 } }`. Offsets are zero-based,
+end-exclusive bytes in that component's formatted value **before** control
+escaping. The renderer handles clipping, Unicode, and preceding columns.
+Legacy `highlight_item` instead addresses the complete joined search text.
+With `syntax.enabled = true`, an unmodified `C.text({ field = "code" })` can
+receive file-context Tree-sitter colors from `item.file`, `item.pos`, and
+`item.code`, including when the code component is display-only.
+
+Searchable getters run once when candidates enter. Display-only getters,
+highlighters, icon providers and width measurement run only for visible entries;
+values/highlights are cached until candidates are replaced. Getters should be
+pure and synchronous: fetch filesystem/network data in the source, and pass it
+as fields. Use `set_items()` to publish changed values. Resizing reuses values;
+icon-mode and display-width changes refresh layout without re-running getters.
+
+`components` takes precedence over `format_item` and `result_layout`. Lists replace
+earlier component lists, including when empty; `components = false` selects the
+legacy formatter. Files, buffers and recent files use icon/path components by
+default; supplying `format_item` to those built-in pickers retains its legacy
+behavior. Grep and undo keep their specialized layouts unless components are
+explicitly provided.
+
 ### Registering sources
 
 ```lua
@@ -432,6 +534,7 @@ nvim --headless -u NONE -n -i NONE -l tests/sources.lua
 nvim --headless -u NONE -n -i NONE -l tests/file_windows.lua
 nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
 nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
+nvim --headless -u NONE -n -i NONE -l tests/components.lua
 nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
 nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
 nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua
@@ -451,6 +554,11 @@ nvim --headless -u NONE -n -i NONE -l tests/undo.lua
 IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
 python3 tests/tui.py
 ```
+
+`nvim --headless -u NONE -n -i NONE -l tests/components_bench.lua` compares the
+legacy and component paths with 50,000 candidates (five samples, medians). It
+reports opening/first-query/movement latency, retained Lua heap, and lazy
+decoration calls; set `SELECTION_TOOLS_BENCH_ITEMS` to change the candidate count.
 
 Tests cover object/index preservation, cancellation and lifecycle, stale asynchronous results, file search backends, confirmation behavior of built-in sources, and real terminal input. Icon catalog downloads, caching, failures, and cancellation use offline mocks. When skim is installed, tests also exercise real skim and terminal typing, previews, and multiple selection with 60000 candidates; otherwise these external integration tests are skipped. Terminal tests use Python's standard-library PTY support on macOS/Linux.
 

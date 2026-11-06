@@ -38,6 +38,10 @@ return function(opts)
     items = items,
     multi = true,
     preview = { enabled = true },
+    components = not opts.format_item and {
+      require("selection_tools.components").icon(),
+      require("selection_tools.components").path({ field = "text", path_format = false }),
+    } or nil,
     format_item = util.format,
     on_choice = util.jump,
   }

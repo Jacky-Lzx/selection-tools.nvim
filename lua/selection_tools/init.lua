@@ -3,6 +3,7 @@ local M = {}
 local defaults = {
   ui_select = false,
   item_icons = { enabled = true },
+  component_defaults = {},
   syntax = { enabled = false, max_size = 1024 * 1024, max_lines = 10000, cache_size = 8 },
   layout = {
     width = 0.6,
@@ -64,6 +65,18 @@ local select_adapter = function(...)
   return M.select(...)
 end
 
+-- Component sequences replace earlier sequences, including empty lists. Deep
+-- merging descriptor arrays would retain unwanted columns or earlier fields.
+local function merge_options(...)
+  local result = vim.tbl_deep_extend("force", {}, ...)
+  for _, opts in ipairs({ ... }) do
+    if opts.components ~= nil then
+      result.components = vim.deepcopy(opts.components)
+    end
+  end
+  return result
+end
+
 ---@param opts? table
 function M.setup(opts)
   assert(opts == nil or type(opts) == "table", "selection-tools.nvim: setup expects a table")
@@ -116,7 +129,7 @@ end
 ---@param opts table
 ---@return selection_tools.Picker
 function M.open(opts)
-  return require("selection_tools.picker").new(vim.tbl_deep_extend("force", {}, config, opts or {}))
+  return require("selection_tools.picker").new(merge_options(config, opts or {}))
 end
 
 ---Return the live picker owning a window, including a suspended parent.
@@ -133,7 +146,7 @@ end
 function M.select(items, opts, on_choice)
   assert(type(items) == "table", "selection-tools: items must be a list")
   assert(type(on_choice) == "function", "selection-tools: on_choice must be a function")
-  opts = vim.tbl_deep_extend("force", {}, config.select, opts or {})
+  opts = merge_options(config.select, opts or {})
   opts.items, opts.on_choice = items, on_choice
   if opts.preview_item then
     opts.preview.enabled = true
@@ -176,7 +189,7 @@ function M.pick(name, opts)
   assert(source, "selection-tools: unknown source: " .. tostring(name))
   opts = opts or {}
   local spec = type(source) == "function" and source(opts) or source
-  return M.open(vim.tbl_deep_extend("force", {}, spec, opts, { source = name, source_opts = opts }))
+  return M.open(merge_options(spec, opts, { source = name, source_opts = opts }))
 end
 
 function M.resume(opts)

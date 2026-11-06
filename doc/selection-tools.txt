@@ -87,6 +87,10 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsFileIcon     Comment
   SelectionToolsFileLocation Comment foreground without italics
   SelectionToolsDirectoryIcon Directory
+  SelectionToolsText         NormalFloat/Normal foreground only
+  SelectionToolsPath         Directory
+  SelectionToolsPosition     Comment
+  SelectionToolsTime         Number
   SelectionToolsPreviewLine  CursorLine
   SelectionToolsPreviewMatch Search
   SelectionToolsPreviewTrack SelectionToolsBorder
@@ -243,6 +247,98 @@ start a search.
 
 ===============================================================================
 3. PUBLIC API                                           *selection-tools-api*
+
+Composable result rows                            *selection-tools-components*
+>lua
+    local C = require('selection_tools.components')
+    require('selection_tools').open({
+      items = results,
+      components = {
+        C.icon(),
+        C.path({ max_width = 30, grow = 0 }),
+        C.position({ align = 'right' }),
+        C.text({ field = 'message', grow = 1, truncate = 'match' }),
+        C.time({ format = '%H:%M' }),
+        C.text({
+          get = function(item) return item.cached and 'cached' or nil end,
+          searchable = false,
+          hl = 'Comment',
+        }),
+      },
+      on_choice = function(item) print(item.file) end,
+    })
+<
+components works with open(), select() and registered sources. Descriptors are
+reusable; original item identity, navigation, preview and callbacks are retained.
+components takes precedence over format_item and result_layout. Component lists
+replace earlier lists, including {}; components=false uses the legacy formatter.
+Files, buffers and recent files use icon/path components by default. Passing
+format_item to these sources selects their legacy path. Grep and undo retain
+their specialized layouts unless components is supplied explicitly.
+
+Built-ins:
+  text     item.text (or scalar item); SelectionToolsText; searchable=true.
+  path     item.file; SelectionToolsPath; searchable=true, grow=1,
+           truncate='left', path_format=':~:.'. path_format=false preserves
+           an already formatted path.
+  position item.pos={row, zero_based_column}; SelectionToolsPosition;
+           searchable=true. Displays row:column with a one-based column.
+  time     item.timestamp (Unix seconds or a preformatted string);
+           SelectionToolsTime; searchable=false; format='%Y-%m-%d %H:%M:%S',
+           using local time. No relative-time timers are started.
+  icon     Existing item_icons/format_icon provider and shared icon mode;
+           searchable=false. Custom values use format_icon, not field/get.
+
+field changes the input field. get(item, original_index) overrides field.
+Nil and empty strings omit a component and its gap; false becomes 'false'.
+Options resolve from built-in defaults, component_defaults[kind] (setup and
+per-call), then the descriptor. For example:
+>lua
+    require('selection_tools').setup({
+      component_defaults = { path = { hl = 'Comment' } },
+    })
+<
+hl=false inherits the row color. Public highlight groups remain theme/user-owned.
+The normal text default sets foreground only, preserving selection backgrounds.
+
+Sizing uses visible rows and terminal display cells, preserving composed UTF-8
+characters. Nonempty columns have a one-cell gap. Options:
+  width/min_width/max_width  Preferred width, minimum before hiding, upper cap.
+                            Minima never exceed content width.
+  grow                      Weight for sharing spare space (0, or 1 for path).
+  align                     'left' (default) or 'right' within the column.
+  truncate                  'right' (default), 'left', or 'match'.
+  priority                  Lower values shrink first, then hide when their
+                            minima cannot fit. Defaults: icon=10, time=40,
+                            position=50, path=80, text=100. Equal priorities
+                            retain earlier columns first.
+
+Matching joins complete searchable component values in descriptor order with
+one space. Controls are escaped independently of padding/clipping. Hidden data
+remains searchable. Display width, colors, icons and marks do not affect ranking.
+Query positions map back onto the retained component fragments.
+match_text(item, original_index) overrides that search document, e.g. for aliases.
+With this override automatic query highlights are omitted because the strings
+need not correspond. Local component highlights still work.
+
+highlights(item, original_index) returns component-local ranges:
+>lua
+    C.text({ highlights = function(item)
+      return { { 0, 4, hl = 'Function', priority = 100 } }
+    end })
+<
+Offsets are zero-based, end-exclusive bytes before escaping controls. Clipping,
+reordering, and preceding columns need no manual offset arithmetic. By contrast,
+highlight_item uses offsets in the complete joined search document.
+syntax.enabled=true can color an unmodified text component with field='code'
+using item.file/pos/code, even if that component is not searchable.
+
+Only searchable getters run for every candidate on ingestion. Display-only
+getters, highlighters, icons and width measurements run for visible entries.
+Values/highlights are cached until candidate replacement; resize and icon-mode
+changes reuse values. Use pure synchronous callbacks; sources fetch external
+data and publish changes with set_items(). Cached data belongs to the picker.
+
 >lua
     local selection = require('selection_tools')
 <
