@@ -1,6 +1,7 @@
 local util = require("selection_tools.sources.util")
 
-return function()
+return function(opts)
+  opts = opts or {}
   local origin = util.capture()
   local list = vim.fn.getjumplist()
   local items = {}
@@ -27,6 +28,24 @@ return function()
     items = items,
     resume_refresh = true,
     preview = { enabled = true },
+    components = not opts.format_item and {
+      { kind = "icon" },
+      {
+        kind = "text",
+        get = function(item)
+          return item.jump_index == list[2] and ">" or nil
+        end,
+        searchable = false,
+      },
+      { kind = "path" },
+      {
+        kind = "text",
+        get = function(item)
+          return not item.file and "[No Name]" or nil
+        end,
+      },
+      { kind = "position" },
+    } or nil,
     format_item = util.format,
     on_choice = function(item)
       if not item then

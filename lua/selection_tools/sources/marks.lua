@@ -1,6 +1,7 @@
 local util = require("selection_tools.sources.util")
 
-return function()
+return function(opts)
+  opts = opts or {}
   local buf = vim.api.nvim_get_current_buf()
   local marks = vim.fn.getmarklist(buf)
   vim.list_extend(marks, vim.fn.getmarklist())
@@ -37,6 +38,18 @@ return function()
     items = items,
     resume_refresh = true,
     preview = { enabled = true },
+    components = not opts.format_item and {
+      { kind = "icon" },
+      { kind = "text", field = "name" },
+      { kind = "path" },
+      {
+        kind = "text",
+        get = function(item)
+          return not item.file and "[No Name]" or nil
+        end,
+      },
+      { kind = "position" },
+    } or nil,
     format_item = util.format,
     on_choice = util.jump,
   }

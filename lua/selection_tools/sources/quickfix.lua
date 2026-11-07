@@ -1,5 +1,6 @@
 local util = require("selection_tools.sources.util")
-return function(loclist)
+return function(loclist, opts)
+  opts = opts or {}
   local origin = util.capture()
   local function get()
     local what = { items = 1, title = 1, id = 0 }
@@ -19,6 +20,20 @@ return function(loclist)
     }
   end
   return {
+    components = not opts.format_item and {
+      { kind = "icon" },
+      { kind = "text", field = "index" },
+      { kind = "path", path_format = false },
+      { kind = "position" },
+      {
+        kind = "text",
+        get = function(item)
+          return item.entry.text
+        end,
+        grow = 1,
+        truncate = "match",
+      },
+    } or nil,
     prompt = (loclist and "Location list" or "Quickfix") .. ": " .. (list.title or ""),
     items = items,
     resume_refresh = true,

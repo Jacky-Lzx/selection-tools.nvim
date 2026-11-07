@@ -60,6 +60,10 @@ return function(opts)
         return items
       end)
     end,
+    components = not opts.format_item and {
+      require("selection_tools.components").icon(),
+      require("selection_tools.components").path({ field = "text", path_format = false }),
+    } or nil,
     format_item = util.format,
     preview = { enabled = true },
     previewer = function(ctx)

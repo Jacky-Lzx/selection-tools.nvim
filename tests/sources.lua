@@ -41,6 +41,40 @@ end
 local fixture = vim.fn.tempname()
 vim.fn.mkdir(fixture .. "/sub", "p")
 
+test("typed source rows inherit path styles and preserve formatter/list overrides", function()
+  tools.setup({ component_defaults = { path = { hl = "Special" } } })
+  local path = fixture .. "/中文 typed.lua"
+  vim.fn.writefile({ "first", "second" }, path)
+  vim.fn.setqflist({}, " ", { items = { { filename = path, lnum = 2, col = 2, text = "needle" } } })
+  local p = tools.qflist()
+  ready(p)
+  local groups = {}
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(p.list_buf, -1, 0, -1, { details = true })) do
+    local line = vim.api.nvim_buf_get_lines(p.list_buf, mark[2], mark[2] + 1, false)[1]
+    groups[mark[4].hl_group] = line:sub(mark[3] + 1, mark[4].end_col)
+  end
+  assert(groups.Special and groups.Special:find("typed.lua", 1, true))
+  eq(groups.SelectionToolsPosition, "2:2")
+  p:set_query("needle")
+  eq(#p.matches, 1)
+  p:close()
+  p = tools.qflist({
+    format_item = function()
+      return "custom label"
+    end,
+  })
+  assert(not p.components)
+  eq(p.entries[1].text, "custom label")
+  p:close()
+  p = tools.qflist({ components = {} })
+  eq(p.entries[1].text, "")
+  p:close()
+  p = tools.qflist({ components = false })
+  assert(not p.components and p.entries[1].text:find("needle", 1, true))
+  p:close()
+  vim.fn.setqflist({}, "r", { items = {} })
+end)
+
 test("live grep handles literal text, unusual paths, preview positions and stale queries", function()
   local path = fixture .. "/sub/a | b.txt"
   vim.fn.writefile({ "nothing", "prefix needle[1] suffix", "final" }, path)
@@ -300,6 +334,7 @@ test("jump source navigates the native window jump list", function()
   vim.cmd("normal! 10G")
   vim.cmd("normal! 20G")
   local p = tools.jumps()
+  assert(p.components, "jump rows must use typed path/position components")
   assert(#p.entries > 0)
   local target
   for i, entry in ipairs(p.matches) do
@@ -321,6 +356,7 @@ test("mark source includes local and global marks and jumps to their exact colum
   vim.api.nvim_buf_set_mark(0, "a", 2, 3, {})
   vim.api.nvim_buf_set_mark(0, "A", 1, 1, {})
   local p = tools.marks()
+  assert(p.components, "mark rows must use typed path/position components")
   local names = {}
   for i, entry in ipairs(p.matches) do
     names[entry.item.name] = true
