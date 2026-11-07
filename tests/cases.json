@@ -1,0 +1,900 @@
+{
+  "version": 1,
+  "default": [
+    "unit",
+    "ui"
+  ],
+  "defaults": {
+    "GIT_TOOLS_DIR": "{root}/../git-tools.nvim",
+    "THEME_TOOLS_DIR": "{root}/../theme-tools.nvim",
+    "IMAGE_TOOLS_ROOT": "{root}/../image-tools.nvim"
+  },
+  "cases": [
+    {
+      "name": "runner-contracts",
+      "suite": "unit",
+      "command": [
+        "{python}",
+        "tests/runner_checks.py"
+      ],
+      "files": [
+        "tests/runner_checks.py"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "borders",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/borders.lua"
+      ],
+      "files": [
+        "tests/borders.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "command_ownership",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/command_ownership.lua"
+      ],
+      "files": [
+        "tests/command_ownership.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "components",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/components.lua"
+      ],
+      "files": [
+        "tests/components.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "content_columns",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/content_columns.lua"
+      ],
+      "files": [
+        "tests/content_columns.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "file_windows",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/file_windows.lua"
+      ],
+      "files": [
+        "tests/file_windows.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "grep_columns",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/grep_columns.lua"
+      ],
+      "files": [
+        "tests/grep_columns.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "image_tools",
+      "suite": "integration",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/image_tools.lua"
+      ],
+      "files": [
+        "tests/image_tools.lua"
+      ],
+      "requires": [
+        "path:{root}/../image-tools.nvim/lua",
+        "exe:magick"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "item_icons",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/item_icons.lua"
+      ],
+      "files": [
+        "tests/item_icons.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "labels",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/labels.lua"
+      ],
+      "files": [
+        "tests/labels.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "lazy",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/lazy.lua"
+      ],
+      "files": [
+        "tests/lazy.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "match_priority",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/match_priority.lua"
+      ],
+      "files": [
+        "tests/match_priority.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "nested",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/nested.lua"
+      ],
+      "files": [
+        "tests/nested.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "on_change",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/on_change.lua"
+      ],
+      "files": [
+        "tests/on_change.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "preview_providers",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/preview_providers.lua"
+      ],
+      "files": [
+        "tests/preview_providers.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "preview_scroll",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/preview_scroll.lua"
+      ],
+      "files": [
+        "tests/preview_scroll.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "rendering",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/rendering.lua"
+      ],
+      "files": [
+        "tests/rendering.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "run",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/run.lua"
+      ],
+      "files": [
+        "tests/run.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "setup_contract",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/setup_contract.lua"
+      ],
+      "files": [
+        "tests/setup_contract.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "sources",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/sources.lua"
+      ],
+      "files": [
+        "tests/sources.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "streaming",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/streaming.lua"
+      ],
+      "files": [
+        "tests/streaming.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "syntax",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/syntax.lua"
+      ],
+      "files": [
+        "tests/syntax.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "theme",
+      "suite": "integration",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/theme.lua"
+      ],
+      "files": [
+        "tests/theme.lua"
+      ],
+      "requires": [
+        "path:{root}/../theme-tools.nvim/lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "theme_ownership",
+      "suite": "integration",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/theme_ownership.lua"
+      ],
+      "files": [
+        "tests/theme_ownership.lua"
+      ],
+      "requires": [
+        "path:{root}/../theme-tools.nvim/lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "transactions",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/transactions.lua"
+      ],
+      "files": [
+        "tests/transactions.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "undo",
+      "suite": "integration",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/undo.lua"
+      ],
+      "files": [
+        "tests/undo.lua"
+      ],
+      "requires": [
+        "path:{root}/../git-tools.nvim/lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "undo_tree",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/undo_tree.lua"
+      ],
+      "files": [
+        "tests/undo_tree.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "workflows",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-n",
+        "-l",
+        "tests/workflows.lua"
+      ],
+      "files": [
+        "tests/workflows.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "components_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "components_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/components_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "delta_preview_tui",
+      "suite": "integration",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "delta_preview_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/delta_preview_tui.lua"
+      ],
+      "requires": [
+        "path:{root}/../git-tools.nvim/lua",
+        "exe:delta"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "grep_columns_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "grep_columns_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/grep_columns_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "grep_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "grep_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/grep_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "image_tools_tui",
+      "suite": "integration",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "image_tools_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/image_tools_tui.lua"
+      ],
+      "requires": [
+        "path:{root}/../image-tools.nvim/lua",
+        "exe:magick"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "item_icons_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "item_icons_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/item_icons_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "labels_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "labels_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/labels_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "lazy_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "lazy_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/lazy_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "live_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "live_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/live_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "match_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "match_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/match_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "mouse_interaction_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "mouse_interaction_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/mouse_interaction_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "mouse_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "mouse_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/mouse_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "opening_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "opening_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/opening_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "preview_scroll_tui",
+      "suite": "integration",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "preview_scroll_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/preview_scroll_tui.lua"
+      ],
+      "requires": [
+        "path:{root}/../git-tools.nvim/lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "preview_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "preview_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/preview_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "skim_tui",
+      "suite": "acceptance",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "skim_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/skim_tui.lua"
+      ],
+      "requires": [
+        "exe:sk"
+      ],
+      "timeout": 180
+    },
+    {
+      "name": "syntax_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "syntax_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/syntax_tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/tui.lua"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "undo_tui",
+      "suite": "integration",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "undo_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/undo_tui.lua"
+      ],
+      "requires": [
+        "path:{root}/../git-tools.nvim/lua",
+        "exe:delta"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "workflows_tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py",
+        "workflows_tui"
+      ],
+      "files": [
+        "tests/tui.py",
+        "tests/workflows_tui.lua"
+      ],
+      "timeout": 120
+    }
+  ],
+  "support": {
+    "tests/run.sh": "Stable shell entry point for tests/run.py"
+  },
+  "manual": {
+    "tests/components_bench.lua": "Opt-in candidate-count benchmark; compare measurements separately from correctness tests"
+  },
+  "fixtures": {
+    "git-tools.nvim": {
+      "repository": "Jacky-Lzx/git-tools.nvim",
+      "revision": "29a9db7c77f25800d7c4d21483ea8da0e5b064eb",
+      "path": "{root}/../git-tools.nvim"
+    },
+    "image-tools.nvim": {
+      "repository": "Jacky-Lzx/image-tools.nvim",
+      "revision": "8389b34a1e1c715256bb6b97755fdb3887f96bbd",
+      "path": "{root}/../image-tools.nvim"
+    },
+    "theme-tools.nvim": {
+      "repository": "Jacky-Lzx/theme-tools.nvim",
+      "revision": "6eb5fc94618dd0f8e03d97515f8852274a3e6167",
+      "path": "{root}/../theme-tools.nvim"
+    }
+  }
+}

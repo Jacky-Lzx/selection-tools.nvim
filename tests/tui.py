@@ -11,6 +11,7 @@ import signal
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import time
@@ -128,6 +129,12 @@ def run_case(case):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        for case in sys.argv[1:]:
+            if not case.replace("_", "").isalnum() or not (Path(__file__).parent / (case + ".lua")).is_file():
+                raise ValueError("Unknown terminal case: " + case)
+            run_case(case)
+        sys.exit(0)
     run_case("components_tui")
     run_case("opening_tui")
     run_case("tui")

@@ -535,32 +535,10 @@ See `:help selection-tools` for configuration, key bindings, and the full API.
 ## Validation
 
 ```sh
-stylua --check lua plugin tests
-nvim --headless -u NONE -n -i NONE -l tests/run.lua
-nvim --headless -u NONE -n -i NONE -l tests/sources.lua
-nvim --headless -u NONE -n -i NONE -l tests/file_windows.lua
-nvim --headless -u NONE -n -i NONE -l tests/lazy.lua
-nvim --headless -u NONE -n -i NONE -l tests/item_icons.lua
-nvim --headless -u NONE -n -i NONE -l tests/components.lua
-nvim --headless -u NONE -n -i NONE -l tests/rendering.lua
-nvim --headless -u NONE -n -i NONE -l tests/syntax.lua
-nvim --headless -u NONE -n -i NONE -l tests/grep_columns.lua
-nvim --headless -u NONE -n -i NONE -l tests/content_columns.lua
-nvim --headless -u NONE -n -i NONE -l tests/workflows.lua
-nvim --headless -u NONE -n -i NONE -l tests/borders.lua
-nvim --headless -u NONE -n -i NONE -l tests/labels.lua
-nvim --headless -u NONE -n -i NONE -l tests/streaming.lua
-nvim --headless -u NONE -n -i NONE -l tests/preview_providers.lua
-nvim --headless -u NONE -n -i NONE -l tests/preview_scroll.lua
-nvim --headless -u NONE -n -i NONE -l tests/transactions.lua
-nvim --headless -u NONE -n -i NONE -l tests/nested.lua
-nvim --headless -u NONE -n -i NONE -l tests/on_change.lua
-nvim --headless -u NONE -n -i NONE -l tests/undo_tree.lua
-# Optional: sibling git-tools.nvim (or GIT_TOOLS_DIR) and delta
-nvim --headless -u NONE -n -i NONE -l tests/undo.lua
-# Optional: real image-tools API and media/cache integration; tests simulate Kitty responses
-IMAGE_TOOLS_ROOT=/path/to/image-tools.nvim nvim --headless -u NONE -n -i NONE -l tests/image_tools.lua
-python3 tests/tui.py
+sh tests/run.sh                    # Registered standalone and real-input suites
+sh tests/run.sh --list             # Inspect commands before running them
+python3 tests/run.py fixtures      # Explicitly install pinned absent siblings
+sh tests/run.sh integration --locked # Required cross-plugin scenarios
 ```
 
 `nvim --headless -u NONE -n -i NONE -l tests/components_bench.lua` compares the
@@ -664,3 +642,5 @@ only while still owned. It resets setup options, preserves registered custom
 sources, and is safe to repeat; call setup to install the adapter again.
 
 User-command metadata and highlight-definition tables use Lua syntax in previews. Expanded item details retain the item filetype and syntax, matching the preview.
+
+[Test workflow](tests/README.md): registered suites, filtering, required fixtures and retained failure evidence.
