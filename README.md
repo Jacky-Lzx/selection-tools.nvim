@@ -443,6 +443,13 @@ pure and synchronous: fetch filesystem/network data in the source, and pass it
 as fields. Use `set_items()` to publish changed values. Resizing reuses values;
 icon-mode and display-width changes refresh layout without re-running getters.
 
+Composed row and match-range caches retain only the visible candidates. Moving
+the selection within a ready viewport preserves list text, syntax and match
+highlights while updating the selection, count, preview and `on_change` callback.
+Scrolling, changed results/layout/icons, and refreshed source syntax still
+publish complete frames. Consecutive query hits share a highlight range;
+unmatched gaps in fuzzy results retain their original styling.
+
 `components` takes precedence over `format_item` and `result_layout`. Lists replace
 earlier component lists, including when empty; `components = false` selects the
 legacy formatter. Files, buffers and recent files use icon/path components by
@@ -558,7 +565,7 @@ python3 tests/tui.py
 
 `nvim --headless -u NONE -n -i NONE -l tests/components_bench.lua` compares the
 legacy and component paths with 50,000 candidates (five samples, medians). It
-reports opening/first-query/movement latency, retained Lua heap, and lazy
+reports opening/first-query/movement latency (in-view and scrolling), retained Lua heap, and lazy
 decoration calls; set `SELECTION_TOOLS_BENCH_ITEMS` to change the candidate count.
 
 Tests cover object/index preservation, cancellation and lifecycle, stale asynchronous results, file search backends, confirmation behavior of built-in sources, and real terminal input. Icon catalog downloads, caching, failures, and cancellation use offline mocks. When skim is installed, tests also exercise real skim and terminal typing, previews, and multiple selection with 60000 candidates; otherwise these external integration tests are skipped. Terminal tests use Python's standard-library PTY support on macOS/Linux.

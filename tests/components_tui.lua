@@ -59,7 +59,7 @@ local function check(expect_hit)
   assert(not api.nvim_get_hl(0, { name = "SelectionToolsText", link = false }).bg)
 end
 local timer = assert(vim.uv.new_timer())
-local stage, ticks, marked_item = "start", 0, nil
+local stage, ticks, marked_item, before_move, list_tick = "start", 0, nil, nil, nil
 local function mark(value)
   vim.fn.writefile({ value }, directory .. "/stage")
 end
@@ -82,6 +82,12 @@ timer:start(
         stage = "typed"
       elseif stage == "typed" and p.query == "needle" then
         check(true)
+        before_move, list_tick = p.index, api.nvim_buf_get_changedtick(p.list_buf)
+        mark("move")
+        stage = "moved"
+      elseif stage == "moved" and p.index ~= before_move then
+        check(true)
+        assert(api.nvim_buf_get_changedtick(p.list_buf) == list_tick, "selection movement rewrote visible text")
         marked_item = p:current()
         mark("select")
         stage = "selected"
@@ -107,7 +113,7 @@ timer:start(
         assert(api.nvim_buf_get_lines(source, 0, -1, false)[1] == "original source")
         finish(
           true,
-          "PASS terminal components: Unicode clipping, query colors, wide icons, reverse rows, marks, narrow resizing and focus restoration"
+          "PASS terminal components: Unicode clipping, query colors, wide icons, selection-only movement, reverse rows, marks, narrow resizing and focus restoration"
         )
       end
     end, debug.traceback)

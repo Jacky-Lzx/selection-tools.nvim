@@ -1,5 +1,7 @@
 local api = vim.api
 local ns = api.nvim_create_namespace("selection_tools")
+local selection_ns = api.nvim_create_namespace("selection_tools_selection")
+local count_ns = api.nvim_create_namespace("selection_tools_count")
 local position_ns = api.nvim_create_namespace("selection_tools_preview_position")
 local active
 local empty_ranges = {}
@@ -125,6 +127,10 @@ function Picker:_draw_frame()
     api.nvim_buf_set_extmark(self.frame_buf, ns, row, 0, { line_hl_group = "SelectionToolsBorder" })
   end
   self:_draw_separators()
+  self:_draw_count()
+end
+
+function Picker:_draw_count()
   local marked = vim.tbl_count(self.marks)
   local status = self.error and "Error" or nil
   local current = self.matches[self.index] and self.index or 0
@@ -140,7 +146,8 @@ function Picker:_draw_frame()
     api.nvim_win_set_config(self.input_win, { width = input_width })
   end
   local input_row = self.opts.layout.input_position == "bottom" and self.resolved.total_height - 1 or 0
-  api.nvim_buf_set_extmark(self.frame_buf, ns, input_row, 0, {
+  api.nvim_buf_set_extmark(self.frame_buf, count_ns, input_row, 0, {
+    id = 1,
     virt_text = { { count, "SelectionToolsCount" } },
     virt_text_pos = "right_align",
   })
@@ -529,7 +536,95 @@ function Picker:_syntax(entry)
   return entry.syntax_ranges
 end
 
-function Picker:_render()
+function Picker:_paint_selection(row)
+  if row then
+    -- Keep selection separate from content so moving it does not invalidate
+    -- syntax, source or query highlights. Priority stays below query matches.
+    api.nvim_buf_set_extmark(self.list_buf, selection_ns, row - 1, 0, {
+      id = 1,
+      end_row = row,
+      end_col = 0,
+      hl_group = "SelectionToolsSelected",
+      hl_eol = true,
+      priority = 90,
+    })
+    api.nvim_win_set_cursor(self.list_win, { row, 0 })
+  else
+    api.nvim_buf_clear_namespace(self.list_buf, selection_ns, 0, -1)
+  end
+end
+
+function Picker:_can_select(count, reverse, show_marks)
+  local frame = self.painted_frame
+  if
+    not frame
+    or self.matching
+    or self.finder_pending
+    or self.syntax_pending
+    or frame.matches ~= self.matches
+    or frame.positions ~= self.positions
+    or frame.count ~= count
+    or frame.query ~= self.query
+    or frame.generation ~= self.generation
+    or frame.offset ~= self.offset
+    or frame.resolved ~= self.resolved
+    or frame.reverse ~= reverse
+    or frame.show_marks ~= show_marks
+    or frame.marks ~= self.marks
+    or frame.ambiwidth ~= vim.o.ambiwidth
+    or frame.syntax_enabled ~= self.opts.syntax.enabled
+    or frame.tick ~= api.nvim_buf_get_changedtick(self.list_buf)
+  then
+    return false
+  end
+  local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
+  if self.row_to_index[row] ~= self.index then
+    return false
+  end
+  -- Loaded buffers can change outside the picker. Recheck syntax snapshots even
+  -- on selection-only updates, allowing pending/new spans to take the full path.
+  if self.opts.syntax.enabled then
+    for visible_row, index in pairs(self.row_to_index) do
+      if self:_syntax(self.matches[index]) ~= frame.syntax[visible_row] then
+        return false
+      end
+    end
+  end
+  return row
+end
+
+function Picker:_after_render(selection_only)
+  self.rendering = false
+  local dynamic = false
+  for _, label in pairs(self.opts.layout.labels or {}) do
+    dynamic = dynamic or type(label.text) == "function"
+  end
+  local frame = self.painted_frame
+  if selection_only and not dynamic and frame.prompt == self.opts.prompt and frame.cwd == self.opts.cwd then
+    self:_draw_count()
+  else
+    self:_draw_frame()
+  end
+  if self.preview and self.preview_win then
+    self.preview:update(self:current())
+    self:_restore_preview()
+  end
+  if self.opts.on_change and not self.matching and not self.finder_pending then
+    local item, index = self:current()
+    if not self.change_notified or item ~= self.change_item or index ~= self.change_index then
+      self.change_notified, self.change_item, self.change_index = true, item, index
+      local ok, err = pcall(self.opts.on_change, item, index, self)
+      if not ok then
+        notify(err)
+      end
+      if not self.closed then
+        self:_setup_highlights()
+      end
+    end
+  end
+end
+
+function Picker:_render(selection_only)
   if self.closed or self.child or self.resuming or not self.list_buf or not api.nvim_buf_is_valid(self.list_buf) then
     return
   end
@@ -547,10 +642,17 @@ function Picker:_render()
   elseif self.index > self.offset + self.height then
     self.offset = self.index - self.height
   end
-  local lines = {}
-  local row_to_index, syntax, pending = {}, {}, false
   local reverse = self.opts.layout.reverse
   local show_marks = self.opts.multi and next(self.marks) ~= nil
+  local selected_row = selection_only and self:_can_select(count, reverse, show_marks)
+  if selected_row then
+    self.rendering = true
+    self:_paint_selection(selected_row)
+    self:_after_render(true)
+    return
+  end
+  local lines = {}
+  local row_to_index, syntax, pending = {}, {}, false
   local mark_width = show_marks and vim.fn.strdisplaywidth("○ │ ") or 0
   local icons, icon_width, rows = {}, 0, {}
   local columns = not self.components and self.opts.result_layout == "grep" and require("selection_tools.grep_row")
@@ -703,38 +805,31 @@ function Picker:_render()
       visible_ranges[self.matches[index]] = self.match_range_cache[self.matches[index]]
     end
     local row = reverse and (self.height - (self.index - self.offset) + 1) or (self.index - self.offset)
-    -- A text range respects match priorities; line_hl_group can mask bg-only Search.
-    api.nvim_buf_set_extmark(
-      self.list_buf,
-      ns,
-      row - 1,
-      0,
-      { end_row = row, end_col = 0, hl_group = "SelectionToolsSelected", hl_eol = true, priority = 90 }
-    )
-    api.nvim_win_set_cursor(self.list_win, { row, 0 })
+    self:_paint_selection(row)
   else
+    self:_paint_selection(nil)
     api.nvim_buf_set_extmark(self.list_buf, ns, 0, 0, { line_hl_group = "Comment" })
   end
   self.match_range_cache = visible_ranges
-  self.rendering = false
-  self:_draw_frame()
-  if self.preview and self.preview_win then
-    self.preview:update(self:current())
-    self:_restore_preview()
-  end
-  if self.opts.on_change and not self.matching and not self.finder_pending then
-    local item, index = self:current()
-    if not self.change_notified or item ~= self.change_item or index ~= self.change_index then
-      self.change_notified, self.change_item, self.change_index = true, item, index
-      local ok, err = pcall(self.opts.on_change, item, index, self)
-      if not ok then
-        notify(err)
-      end
-      if not self.closed then
-        self:_setup_highlights()
-      end
-    end
-  end
+  self.painted_frame = {
+    matches = self.matches,
+    positions = self.positions,
+    count = count,
+    query = self.query,
+    generation = self.generation,
+    offset = self.offset,
+    resolved = self.resolved,
+    reverse = reverse,
+    show_marks = show_marks,
+    marks = self.marks,
+    ambiwidth = vim.o.ambiwidth,
+    syntax_enabled = self.opts.syntax.enabled,
+    syntax = syntax,
+    tick = api.nvim_buf_get_changedtick(self.list_buf),
+    prompt = self.opts.prompt,
+    cwd = self.opts.cwd,
+  }
+  self:_after_render(false)
 end
 
 function Picker:_cancel_finder()
@@ -915,7 +1010,7 @@ end
 function Picker:move(delta)
   if not self.closed and #self.matches > 0 then
     self.index = ((self.index - 1 + delta) % #self.matches) + 1
-    self:_render()
+    self:_render(true)
   end
 end
 
@@ -933,7 +1028,7 @@ function Picker:scroll_list(direction)
     delta = -delta
   end
   self.index = math.max(1, math.min(#self.matches, self.index + delta))
-  self:_render()
+  self:_render(true)
 end
 
 function Picker:scroll_preview(direction, lines)
@@ -1337,7 +1432,7 @@ function Picker:_events()
       local index = self.row_to_index[api.nvim_win_get_cursor(self.list_win)[1]]
       if not self.rendering and not self.syntax_pending and index and index ~= self.index then
         self.index = index
-        self:_render()
+        self:_render(true)
       end
     end,
   })

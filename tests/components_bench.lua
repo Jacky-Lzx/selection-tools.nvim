@@ -16,7 +16,7 @@ local function median(values)
   return values[math.ceil(#values / 2)]
 end
 for _, mode in ipairs({ "legacy", "components", "decorated" }) do
-  local samples = { open = {}, query = {}, move = {}, heap = {} }
+  local samples = { open = {}, query = {}, move = {}, in_view = {}, heap = {} }
   local calls, visible = 0, 0
   for _ = 1, 5 do
     collectgarbage("collect")
@@ -56,6 +56,11 @@ for _, mode in ipairs({ "legacy", "components", "decorated" }) do
     p:set_query("needle")
     samples.query[#samples.query + 1] = elapsed(start)
     start = vim.uv.hrtime()
+    for step = 1, 50 do
+      p:move(step % 2 == 1 and 1 or -1)
+    end
+    samples.in_view[#samples.in_view + 1] = elapsed(start) / 50
+    start = vim.uv.hrtime()
     for _ = 1, 50 do
       p:move(1)
     end
@@ -64,11 +69,12 @@ for _, mode in ipairs({ "legacy", "components", "decorated" }) do
     tools.dispose()
   end
   print(
-    ("%s: N=%d, open=%.2f ms, first query=%.2f ms, move=%.3f ms, Lua heap=%.2f MiB, decoration calls=%d (initial visible=%d)"):format(
+    ("%s: N=%d, open=%.2f ms, first query=%.2f ms, in-view move=%.3f ms, scrolling move=%.3f ms, Lua heap=%.2f MiB, decoration calls=%d (initial visible=%d)"):format(
       mode,
       count,
       median(samples.open),
       median(samples.query),
+      median(samples.in_view),
       median(samples.move),
       median(samples.heap),
       calls,

@@ -44,7 +44,7 @@ function M.setup(picker)
             local index = math.max(1, math.min(#picker.matches, picker.index + delta))
             if index ~= picker.index then
               picker.index = index
-              picker:_render()
+              picker:_render(true)
             end
           end
         end
@@ -59,7 +59,7 @@ function M.setup(picker)
         if action ~= "release" then
           if picker.index ~= index then
             picker.index = index
-            picker:_render()
+            picker:_render(true)
           end
           if action == "confirm" then
             picker:confirm()
