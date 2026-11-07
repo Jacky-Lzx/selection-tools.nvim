@@ -1,20 +1,60 @@
-*selection-tools.txt*  Searchable lists and built-in sources for Neovim
+*selection-tools.txt*	Reusable searchable pickers and built-in file, buffer and text sources.
 
-===============================================================================
-CONTENTS                                                    *selection-tools*
+==============================================================================
+CONTENTS                                                     *selection-tools*
 
-  1. Setup                          |selection-tools-setup|
-  2. Usage                          |selection-tools-usage|
-  3. Public API                     |selection-tools-api|
-  4. Finder contract                |selection-tools-finder|
-  5. Picker methods                 |selection-tools-methods|
-  6. Matching backends              |selection-tools-matcher|
-  7. Built-in sources               |selection-tools-sources|
+  Quick start         |selection-tools-quickstart|
+  Commands            |selection-tools-commands|
+  Options             |selection-tools-options|
+  Lua API             |selection-tools-api|
+  Lifecycle           |selection-tools-lifecycle|
+  Troubleshooting     |selection-tools-troubleshooting|
 
-Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua dependencies.
+==============================================================================
+QUICK START                                       *selection-tools-quickstart*
 
-===============================================================================
-1. SETUP                                              *selection-tools-setup*
+Requires Neovim 0.10+. File search needs fd or rg; grep needs rg. Ordinary
+list selection has no external dependency. Icons and skim matching are
+optional.
+
+>lua
+    require("selection_tools").setup({})
+<
+
+The example above selects a small working setup. Full defaults, options and
+feature contracts are documented in this reference. Public installation and
+package-manager examples are in README.md.
+
+==============================================================================
+TROUBLESHOOTING                              *selection-tools-troubleshooting*
+
+Check the minimum Neovim version and feature dependencies first. Global
+mappings shown in the README are configuration examples unless explicitly
+documented as plugin defaults. Keep one owner for each overridden UI or
+mapping.
+
+==============================================================================
+COMMANDS                                            *selection-tools-commands*
+
+:SelectionTools files
+:SelectionTools buffers
+
+See the workflow guide for usage examples and the detailed reference below for
+arguments and feature-specific commands.
+
+==============================================================================
+OPTIONS                                              *selection-tools-options*
+
+Options are passed to require("selection_tools").setup(opts). The quick start
+is an example, not a dump of defaults. Detailed configuration and examples
+follow below.
+
+==============================================================================
+Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua
+dependencies.
+
+==============================================================================
+1. SETUP                                               *selection-tools-setup*
 >lua
     require('selection_tools').setup({
       ui_select = false,
@@ -28,24 +68,27 @@ Requires Neovim 0.10+. File search requires fd or ripgrep. No Lua dependencies.
     })
 <
 Setup is optional. Width/height values <= 1 are fractions of available space;
-larger values are columns/rows. Size is clamped to the editor. The picker needs
-at least 12 columns and 8 usable rows. Border accepts |nvim_open_win()| styles.
+larger values are columns/rows. Size is clamped to the editor. The picker
+needs at least 12 columns and 8 usable rows. Border accepts |nvim_open_win()|
+styles.
 
 Key lists replace the defaults for that action. Use {} to disable an action.
 Bindings are local to picker buffers. The results buffer also maps j/k for
 navigation and / to focus the search input in Insert mode.
 
-ui_select=true installs the |vim.ui.select()| adapter. Calling setup with false
-restores the previous implementation only if our adapter still owns the slot.
-Load the plugin before callers if you want it to handle vim.ui.select calls.
-The adapter also supports preview_item and automatically enables its preview.
+ui_select=true installs the |vim.ui.select()| adapter. Calling setup with
+false restores the previous implementation only if our adapter still owns the
+slot. Load the plugin before callers if you want it to handle vim.ui.select
+calls. The adapter also supports preview_item and automatically enables its
+preview.
 
-Layout options: input_position ('top' or 'bottom'), reverse (false), min_width,
-max_width, preview_height (0.6) and title_pos ('center'). All panes share one
-outer border; there is no backdrop. Reverse places the first match at the bottom
-of the list. Movement keys follow screen directions, while move(delta) follows
-candidate rank. select.layout overrides the layout for select()/vim.ui.select;
-its default is a compact, forward list below an input at the top.
+Layout options: input_position ('top' or 'bottom'), reverse (false),
+min_width, max_width, preview_height (0.6) and title_pos ('center'). All panes
+share one outer border; there is no backdrop. Reverse places the first match
+at the bottom of the list. Movement keys follow screen directions, while
+move(delta) follows candidate rank. select.layout overrides the layout for
+select()/vim.ui.select; its default is a compact, forward list below an input
+at the top.
 
 Additional default keys and their action names:
   CTRL-Q quickfix, CTRL-L loclist  Export marks, or all filtered results.
@@ -66,8 +109,8 @@ Optional key actions (none are bound by default):
   ignore                         Consume a key without taking an action.
 
 These actions fall back to the current item if there are no marks. Copy/open
-leave the picker open. A custom system_open(path) callback may be supplied;
-it should return a success value and an optional error as its second result.
+leave the picker open. A custom system_open(path) callback may be supplied; it
+should return a success value and an optional error as its second result.
 actions = { name = function(picker) ... end } defines custom key actions.
 
 history = { limit = 100, persist = false } stores source-scoped query history.
@@ -96,18 +139,20 @@ Highlight groups (default links unless noted; may be overridden):
   SelectionToolsPreviewTrack SelectionToolsBorder
   SelectionToolsPreviewThumb Title
 
-The selected-row background is a lower-priority text range, so query highlights
-remain visible even when Search only defines a background color. Count styling
-preserves its colors and disables italic in both RGB and terminal attributes.
+The selected-row background is a lower-priority text range, so query
+highlights remain visible even when Search only defines a background color.
+Count styling preserves its colors and disables italic in both RGB and
+terminal attributes.
 
-===============================================================================
-2. USAGE                                              *selection-tools-usage*
+==============================================================================
+2. USAGE                                               *selection-tools-usage*
 
-:SelectionTools [source]                                    *:SelectionTools*
+:SelectionTools [source]                                     *:SelectionTools*
     Open a registered source. Defaults to files. Supports source completion.
 
 Built-in sources:
-  files    Asynchronously enumerate files, then filter the cached list locally.
+  files    Asynchronously enumerate files, then filter the cached list
+      locally.
            Prefer fd; use rg if fd is unavailable. Ignore rules are respected.
            hidden=true includes hidden files. ignored=true disables ignore
            rules. .git is always excluded. cwd defaults to the calling cwd;
@@ -132,70 +177,73 @@ editor click cancels and leaves the clicked editor in Normal mode. Mappings
 are buffer-local; global mouse options are unchanged.
 
 The current-position/result-count indicator appears at the right of the input
-row, with space reserved even when the query scrolls horizontally. The position
-is 1-based within the filtered results; no matches displays 0/0. Loading and
-matching labels are hidden. Internal dividers join the
-outer border and do not display preview filenames. Previews use absolute line
+row, with space reserved even when the query scrolls horizontally. The
+position is 1-based within the filtered results; no matches displays 0/0.
+Loading and matching labels are hidden. Internal dividers join the outer
+border and do not display preview filenames. Previews use absolute line
 numbers.
 
-
-Result exports: CTRL-Q sends marked items, or all filtered results without marks,
-to Quickfix. CTRL-L targets the calling window location list. Only file/buffer
-locations are exported. keys.quickfix_all and keys.loclist_all always export all.
+Result exports: CTRL-Q sends marked items, or all filtered results without
+marks, to Quickfix. CTRL-L targets the calling window location list. Only
+file/buffer locations are exported. keys.quickfix_all and keys.loclist_all
+always export all.
 
 CTRL-X opens locations in horizontal splits, CTRL-V in vertical splits, and
 CTRL-T in tabs. Each selected item gets its own window/tab; without marks only
-the current item opens. Loaded dirty buffers and exact positions are preserved.
+the current item opens. Loaded dirty buffers and exact positions are
+preserved.
 
-F2 opens read-only, wrapped item details: full path, position and complete code
-or content. Normal-mode navigation works; CTRL-Y copies full content. q/Esc/F2
-returns to the same picker without losing input/selection. Closing the picker
-also removes its detail window and scratch buffer. F3 expands the existing
-preview while retaining a small result list; press again to restore its ratio.
+F2 opens read-only, wrapped item details: full path, position and complete
+code or content. Normal-mode navigation works; CTRL-Y copies full content.
+q/Esc/F2 returns to the same picker without losing input/selection. Closing
+the picker also removes its detail window and scratch buffer. F3 expands the
+existing preview while retaining a small result list; press again to restore
+its ratio.
 
 File/buffer sources enable preview and multiple selection. Marked files are
-added to the buffer list; confirmation displays the first marked file.
-Custom finder callbacks may call ctx.append_items(items) to append rows and
-ctx.done({truncated=reason}) to report a limit. ctx.set_items replaces all rows.
+added to the buffer list; confirmation displays the first marked file. Custom
+finder callbacks may call ctx.append_items(items) to append rows and
+ctx.done({truncated=reason}) to report a limit. ctx.set_items replaces all
+rows.
 
-The grep source streams ripgrep JSON output in scheduled batches. Visible results
-arrive before the producer exits; appends preserve the selected item and marks.
-limit=10000, max_output=32 MiB and max_line_bytes=1 MiB bound work/output.
-Reaching a bound stops the process, shows "Limit reached", and sets
-picker.truncated to the reason. The result limit is not a total-match count.
-New queries/option changes/close cancel producers and discard late chunks.
-While waiting for the first replacement batch, the current list and preview
-remain visible; confirmation, split opening and result exports are paused.
-The first search leaves the list blank until results arrive. "No results" is
-shown only when the search completes without results, with no loading label.
-It defaults to literal smart-case search; regex=true enables regex patterns.
-Options include cwd, hidden, ignored, limit (10000) and debounce_ms (30).
-Grep defaults to result_layout="grep": code is left-aligned; filenames and
-line:column positions each have their own right-aligned column, separated by two
-spaces and followed by a fixed-width icon column. Position width is shared across
-visible rows, so changing digit counts never shifts filename alignment. Icons
-align across rows, including mixed-width glyphs. SelectionToolsFileLocation
-uses the Comment foreground without italics. Code indentation is trimmed for
-display; long code is clipped around the first hit. Long paths use a leading
-ellipsis to retain the filename. Widths use terminal cells and preserve composed
-UTF-8 characters. Narrow layouts omit icons/line positions, then hide the file
-column entirely. Syntax/query ranges follow clipped code; original item data,
-copied paths and navigation remain intact. result_layout="plain" restores the
-file-first layout.
-Custom sources can reuse result_layout="grep" with item.file (or display_file),
-item.pos and item.code. Optional item.display_code supplies a separate left label
-without changing source code, preview ranges or exported values; display_indent
-preserves its leading whitespace. The formatted label must end with that content.
-Search controls (files/grep): ALT-H hidden, ALT-I ignored, ALT-F directory,
-ALT-G comma-separated file globs (! excludes). Grep also supports ALT-R regex
-and ALT-C case (smart/sensitive/ignore). The top border shows the picker name.
-The preview/list divider shows cwd; the input/list divider shows filters,
+The grep source streams ripgrep JSON output in scheduled batches. Visible
+results arrive before the producer exits; appends preserve the selected item
+and marks. limit=10000, max_output=32 MiB and max_line_bytes=1 MiB bound
+work/output. Reaching a bound stops the process, shows "Limit reached", and
+sets picker.truncated to the reason. The result limit is not a total-match
+count. New queries/option changes/close cancel producers and discard late
+chunks. While waiting for the first replacement batch, the current list and
+preview remain visible; confirmation, split opening and result exports are
+paused. The first search leaves the list blank until results arrive. "No
+results" is shown only when the search completes without results, with no
+loading label. It defaults to literal smart-case search; regex=true enables
+regex patterns. Options include cwd, hidden, ignored, limit (10000) and
+debounce_ms (30). Grep defaults to result_layout="grep": code is left-aligned;
+filenames and line:column positions each have their own right-aligned column,
+separated by two spaces and followed by a fixed-width icon column. Position
+width is shared across visible rows, so changing digit counts never shifts
+filename alignment. Icons align across rows, including mixed-width glyphs.
+SelectionToolsFileLocation uses the Comment foreground without italics. Code
+indentation is trimmed for display; long code is clipped around the first hit.
+Long paths use a leading ellipsis to retain the filename. Widths use terminal
+cells and preserve composed UTF-8 characters. Narrow layouts omit icons/line
+positions, then hide the file column entirely. Syntax/query ranges follow
+clipped code; original item data, copied paths and navigation remain intact.
+result_layout="plain" restores the file-first layout. Custom sources can reuse
+result_layout="grep" with item.file (or display_file), item.pos and item.code.
+Optional item.display_code supplies a separate left label without changing
+source code, preview ranges or exported values; display_indent preserves its
+leading whitespace. The formatted label must end with that content. Search
+controls (files/grep): ALT-H hidden, ALT-I ignored, ALT-F directory, ALT-G
+comma-separated file globs (! excludes). Grep also supports ALT-R regex and
+ALT-C case (smart/sensitive/ignore). The top border shows the picker name. The
+preview/list divider shows cwd; the input/list divider shows filters,
 including hidden:on/off and ignore:on/off plus grep's matching/case modes.
 Labels follow layout.title_pos. Without preview, cwd and filters share the
 input divider. Other pickers with cwd share the directory divider; explicit
-preview titles keep their own divider. Changes
-cancel/restart the finder without changing the input and are retained by resume.
-File glob filtering requires rg. API: picker:set_search_options({ cwd=...,
+preview titles keep their own divider. Changes cancel/restart the finder
+without changing the input and are retained by resume. File glob filtering
+requires rg. API: picker:set_search_options({ cwd=...,
 globs={"*.rs","!vendor/**"}, hidden=true, ignored=true, regex=true, case="ignore" }).
 
 Optional image-tools integration (requires its public supports/render API):
@@ -205,48 +253,51 @@ Optional image-tools integration (requires its public supports/render API):
   } }
 <
 For eager lazy.nvim spec tables, defer require inside a callback calling
-require("selection_tools.integrations.image_tools").preview(ctx). This callback
-uses default provider settings.
-Only image candidates load image-tools. Text and dirty buffers keep file preview.
-provider({page=2,upscale=false}) supplies render options. Image-tools owns media,
-cache and terminal placements; the picker owns windows, focus and lifetime.
-Image switches retain the last ready frame/lease until its replacement is
-acknowledged and painted; skipped requests cancel without blanking that frame.
-No Snacks.image or built-in image renderer is involved. Terminal/preparation
-errors appear in the preview. Extension preflight can be overridden with an
-extensions map; image-tools remains the final format authority.
+require("selection_tools.integrations.image_tools").preview(ctx). This
+callback uses default provider settings. Only image candidates load
+image-tools. Text and dirty buffers keep file preview.
+provider({page=2,upscale=false}) supplies render options. Image-tools owns
+media, cache and terminal placements; the picker owns windows, focus and
+lifetime. Image switches retain the last ready frame/lease until its
+replacement is acknowledged and painted; skipped requests cancel without
+blanking that frame. No Snacks.image or built-in image renderer is involved.
+Terminal/preparation errors appear in the preview. Extension preflight can be
+overridden with an extensions map; image-tools remains the final format
+authority.
 
 preview.providers is an ordered list of callbacks receiving item/index/path,
 source_buf, buf/win, is_cancelled(), set_lines() and paint(draw,metadata).
-false/nil declines; true, a cancel function, or an object with close()/resize()
-handles the item. preview_item and source-specific previewer take precedence.
-paint invokes draw(buf,win) with writable flags restored afterward; lines and
-extmarks are one guarded transaction. Main-thread calls are synchronous; fast
-callbacks schedule the whole transaction. Stale requests do not draw. resize()
-notifies the handle after layout changes. Optional retain() returns a frozen
-ready display handle on change; ctx.previous passes it to the next provider,
-and ctx.has_preview indicates existing content. The next paint/set_lines or
-cancellation releases the retained handle. Other providers close immediately.
+false/nil declines; true, a cancel function, or an object with
+close()/resize() handles the item. preview_item and source-specific previewer
+take precedence. paint invokes draw(buf,win) with writable flags restored
+afterward; lines and extmarks are one guarded transaction. Main-thread calls
+are synchronous; fast callbacks schedule the whole transaction. Stale requests
+do not draw. resize() notifies the handle after layout changes. Optional
+retain() returns a frozen ready display handle on change; ctx.previous passes
+it to the next provider, and ctx.has_preview indicates existing content. The
+next paint/set_lines or cancellation releases the retained handle. Other
+providers close immediately.
 
 Visible grep code snippets reuse complete-file Tree-sitter contexts, including
-injections and multiline strings. Loaded buffers are read without modification;
-other files load asynchronously. Queries use the current runtime's highlights.
-Only visible rows extract captures, and the bounded document cache keeps at
-least cache_size or the number of visible rows. New queries validate disk
-metadata; changed buffer ticks refresh buffer snapshots. Missing parsers/queries
-and files over the limits keep plain code plus query matches.
-Cached colors remain visible during validation when the code still matches.
-For uncached or changed rows, the previous frame remains until visible syntax
-is ready; text and highlights are published together. Confirmation, marking,
-copying, opening and exporting unpainted results are paused during preparation.
+injections and multiline strings. Loaded buffers are read without
+modification; other files load asynchronously. Queries use the current
+runtime's highlights. Only visible rows extract captures, and the bounded
+document cache keeps at least cache_size or the number of visible rows. New
+queries validate disk metadata; changed buffer ticks refresh buffer snapshots.
+Missing parsers/queries and files over the limits keep plain code plus query
+matches. Cached colors remain visible during validation when the code still
+matches. For uncached or changed rows, the previous frame remains until
+visible syntax is ready; text and highlights are published together.
+Confirmation, marking, copying, opening and exporting unpainted results are
+paused during preparation.
 
 Every visible nonempty ripgrep submatch is highlighted in the result label,
 including multiple hits per line and regex matches. Filenames are excluded.
 Confirming a result opens its exact file/line/column; an empty query does not
 start a search.
 
-===============================================================================
-3. PUBLIC API                                           *selection-tools-api*
+==============================================================================
+3. PUBLIC API                                            *selection-tools-api*
 
 Composable result rows                            *selection-tools-components*
 >lua
@@ -269,12 +320,13 @@ Composable result rows                            *selection-tools-components*
     })
 <
 components works with open(), select() and registered sources. Descriptors are
-reusable; original item identity, navigation, preview and callbacks are retained.
-components takes precedence over format_item and result_layout. Component lists
-replace earlier lists, including {}; components=false uses the legacy formatter.
-Files, buffers and recent files use icon/path components by default. Passing
-format_item to these sources selects their legacy path. Grep and undo retain
-their specialized layouts unless components is supplied explicitly.
+reusable; original item identity, navigation, preview and callbacks are
+retained. components takes precedence over format_item and result_layout.
+Component lists replace earlier lists, including {}; components=false uses the
+legacy formatter. Files, buffers and recent files use icon/path components by
+default. Passing format_item to these sources selects their legacy path. Grep
+and undo retain their specialized layouts unless components is supplied
+explicitly.
 
 Built-ins:
   text     item.text (or scalar item); SelectionToolsText; searchable=true.
@@ -289,21 +341,23 @@ Built-ins:
   icon     Existing item_icons/format_icon provider and shared icon mode;
            searchable=false. Custom values use format_icon, not field/get.
 
-field changes the input field. get(item, original_index) overrides field.
-Nil and empty strings omit a component and its gap; false becomes 'false'.
-Options resolve from built-in defaults, component_defaults[kind] (setup and
-per-call), then the descriptor. For example:
+field changes the input field. get(item, original_index) overrides field. Nil
+and empty strings omit a component and its gap; false becomes 'false'. Options
+resolve from built-in defaults, component_defaults[kind] (setup and per-call),
+then the descriptor. For example:
 >lua
     require('selection_tools').setup({
       component_defaults = { path = { hl = 'Comment' } },
     })
 <
-hl=false inherits the row color. Public highlight groups remain theme/user-owned.
-The normal text default sets foreground only, preserving selection backgrounds.
+hl=false inherits the row color. Public highlight groups remain
+theme/user-owned. The normal text default sets foreground only, preserving
+selection backgrounds.
 
 Sizing uses visible rows and terminal display cells, preserving composed UTF-8
 characters. Nonempty columns have a one-cell gap. Options:
-  width/min_width/max_width  Preferred width, minimum before hiding, upper cap.
+  width/min_width/max_width  Preferred width, minimum before hiding, upper
+      cap.
                             Minima never exceed content width.
   grow                      Weight for sharing spare space (0, or 1 for path).
   align                     'left' (default) or 'right' within the column.
@@ -315,11 +369,11 @@ characters. Nonempty columns have a one-cell gap. Options:
 
 Matching joins complete searchable component values in descriptor order with
 one space. Controls are escaped independently of padding/clipping. Hidden data
-remains searchable. Display width, colors, icons and marks do not affect ranking.
-Query positions map back onto the retained component fragments.
-match_text(item, original_index) overrides that search document, e.g. for aliases.
-With this override automatic query highlights are omitted because the strings
-need not correspond. Local component highlights still work.
+remains searchable. Display width, colors, icons and marks do not affect
+ranking. Query positions map back onto the retained component fragments.
+match_text(item, original_index) overrides that search document, e.g. for
+aliases. With this override automatic query highlights are omitted because the
+strings need not correspond. Local component highlights still work.
 
 highlights(item, original_index) returns component-local ranges:
 >lua
@@ -327,11 +381,12 @@ highlights(item, original_index) returns component-local ranges:
       return { { 0, 4, hl = 'Function', priority = 100 } }
     end })
 <
-Offsets are zero-based, end-exclusive bytes before escaping controls. Clipping,
-reordering, and preceding columns need no manual offset arithmetic. By contrast,
-highlight_item uses offsets in the complete joined search document.
-syntax.enabled=true can color an unmodified text component with field='code'
-using item.file/pos/code, even if that component is not searchable.
+Offsets are zero-based, end-exclusive bytes before escaping controls.
+Clipping, reordering, and preceding columns need no manual offset arithmetic.
+By contrast, highlight_item uses offsets in the complete joined search
+document. syntax.enabled=true can color an unmodified text component with
+field='code' using item.file/pos/code, even if that component is not
+searchable.
 
 Only searchable getters run for every candidate on ingestion. Display-only
 getters, highlighters, icons and width measurements run for visible entries.
@@ -342,29 +397,33 @@ data and publish changes with set_items(). Cached data belongs to the picker.
 >lua
     local selection = require('selection_tools')
 <
-selection.select(items, opts, on_choice)
-    Open a searchable list. Supports arbitrary Lua values. format_item(item)
-    returns the displayed/searchable string; defaults to tostring(item).
-    on_choice(item, index) receives the original value and original 1-based
-    index, even after filtering. Cancellation passes nil, nil. The callback
-    runs once, after cleanup and focus restoration. Returns a picker.
+selection.select(items, opts, on_choice) Open a searchable list. Supports
+arbitrary Lua values. format_item(item) returns the displayed/searchable
+string; defaults to tostring(item). on_choice(item, index) receives the
+original value and original 1-based index, even after filtering. Cancellation
+passes nil, nil. The callback runs once, after cleanup and focus restoration.
+Returns a picker.
 
-selection.open(opts)
-    Open a picker with items or finder. Returns a picker. Options:
+selection.open(opts) Open a picker with items or finder. Returns a picker.
+Options:
       items          Candidate list.
       format_item    Searchable label: fun(item): string.
-      highlight_item Optional fun(item, original_index): {{start_byte,end_byte}}.
+      highlight_item Optional fun(item, original_index):
+          {{start_byte,end_byte}}.
                      Zero-based, end-exclusive byte ranges in format_item's
                      output. Uses SelectionToolsMatch, independently of local
                      matching. Only visible entries resolve and cache ranges;
                      replacing candidates resets the cache. Icons/marks and
                      escaped control bytes are accounted for by the renderer.
-                     Ranges may set hl and priority for semantic content colors;
+                     Ranges may set hl and priority for semantic content
+                         colors;
                      default SelectionToolsMatch priority is 110. Use a lower
-                     priority (for example 100) to retain query-match highlights.
+                     priority (for example 100) to retain query-match
+                         highlights.
       item_icons     { enabled=true }. false or { enabled=false } disables
                      automatic and custom item icons.
-      format_icon    Optional fun(item, original_index): glyph, highlight_group.
+      format_icon    Optional fun(item, original_index): glyph,
+          highlight_group.
                      Overrides automatic file icons; nil means no icon.
       prompt         Window title; default 'Select'.
       query          Initial query; default ''.
@@ -386,7 +445,8 @@ selection.open(opts)
                        cache_size=8 }. grep enables this by default. Applies
                        native Tree-sitter captures to item.code at the byte
                        offset item.content_offset within the formatted label;
-                       item.file and item.pos identify the full source context.
+                       item.file and item.pos identify the full source
+                           context.
       layout, keys   Per-call overrides of setup options.
       layout.labels  Independent border labels: top, middle and bottom, each
                      { text=..., align="left"|"center"|"right" }. Applies to
@@ -395,9 +455,11 @@ selection.open(opts)
                      With bottom input, defaults are title/path/filters. Top
                      input swaps the automatic path/filters. Without preview,
                      only bottom exists and combines path/filters by default.
-                     text: string, false/"" to hide, or fun(picker, default_text)
+                     text: string, false/"" to hide, or fun(picker,
+                         default_text)
                      returning string, false or nil (automatic). Omit text for
-                     automatic content. Callbacks run on redraw; keep them fast
+                     automatic content. Callbacks run on redraw; keep them
+                         fast
                      and free of side effects. Callback errors/invalid results
                      warn once per label and use automatic content.
                      align defaults to layout.title_pos, or left for explicit
@@ -410,74 +472,76 @@ selection.open(opts)
                        position=true }. Built-in sources enable it.
                      title=true shows the preview title on its divider,
                      clipped to the available display cells; undo enables it.
-                     scrollbar overlays the right border; position shows scroll
-                     progress as a percentage with up/down arrows on the divider.
-                     Both hide when content fits. Disable either independently.
+                     scrollbar overlays the right border; position shows
+                         scroll
+                     progress as a percentage with up/down arrows on the
+                         divider.
+                     Both hide when content fits. Disable either
+                         independently.
       preview_item   vim.ui.select-style function(item) returning a buffer
                      and optional pos. Caller buffers are displayed directly
                      without changing their options or deleting them.
       previewer      Custom function(ctx), optionally returning a cancel
                      function. ctx contains item, index, buf, win,
-                     is_cancelled(), set_lines(lines, ft, title, pos, metadata).
+                     is_cancelled(), set_lines(lines, ft, title, pos,
+                         metadata).
                      set_lines is safe from async callbacks. Late results
                      are ignored. The built-in previewer reads files
                      asynchronously and prefers unsaved loaded buffers.
 
-File-like items (file, bufnr or buf) display file type icons; dir items display
-folder icons. The optional nvim-web-devicons provider loads only when a file
-icon is needed. Exact filenames and compound extensions are preserved; buffer
-filetypes provide a fallback. Without the provider, a default file glyph is
-used. A Nerd Font is needed for Nerd Font glyphs.
+File-like items (file, bufnr or buf) display file type icons; dir items
+display folder icons. The optional nvim-web-devicons provider loads only when
+a file icon is needed. Exact filenames and compound extensions are preserved;
+buffer filetypes provide a fallback. Without the provider, a default file
+glyph is used. A Nerd Font is needed for Nerd Font glyphs.
 
-Only visible entries resolve icons, cached until their candidates are replaced.
-After marking the first item, a left column shows "○ │ " for unmarked items
-and "● │ " for marked items. It remains visible when marked items are filtered
-out and disappears when all marks are cleared.
-Unmarked circles and separators use the theme's Comment color; marked circles
-use Special. Override the corresponding highlight groups to customize them.
-The icon column fits visible glyphs with a one-cell gap on either side.
-Icon colors use their own highlight spans, independently of match
-highlights and multi-select markers. Icons do not
-change searchable text, matcher payloads, copied values or selection indices.
-format_icon receives the original object and index, even after filtering.
+Only visible entries resolve icons, cached until their candidates are
+replaced. After marking the first item, a left column shows "○ │ " for
+unmarked items and "● │ " for marked items. It remains visible when marked
+items are filtered out and disappears when all marks are cleared. Unmarked
+circles and separators use the theme's Comment color; marked circles use
+Special. Override the corresponding highlight groups to customize them. The
+icon column fits visible glyphs with a one-cell gap on either side. Icon
+colors use their own highlight spans, independently of match highlights and
+multi-select markers. Icons do not change searchable text, matcher payloads,
+copied values or selection indices. format_icon receives the original object
+and index, even after filtering.
 
 With multi=true, on_choice receives marked items as an additional third
 argument; with no marks it contains the current item. The first two arguments
 still identify the current item. Cancellation does not return marked items.
 Marks survive local filtering but are cleared when the source replaces items.
 Binary and oversized files show an explanatory preview message. Preview
-scrolling preserves the input focus; preview never edits source buffers.
-The preview scrollbar and percentage follow the displayed window's scrolling,
-F3 expansion, resize and resume, including borrowed buffers and delta frames.
-The percentage measures travel through the loaded preview (0% top, 100% bottom).
+scrolling preserves the input focus; preview never edits source buffers. The
+preview scrollbar and percentage follow the displayed window's scrolling, F3
+expansion, resize and resume, including borrowed buffers and delta frames. The
+percentage measures travel through the loaded preview (0% top, 100% bottom).
 Previews limited by max_lines also show "truncated", even if all loaded lines
 fit. Images suppress text scroll indicators. Track and thumb colors use
 SelectionToolsPreviewTrack and SelectionToolsPreviewThumb; the percentage uses
-SelectionToolsCount.
-Explicit preview positions mark the target line with SelectionToolsPreviewLine.
-Grep supplies item.line_matches as zero-based, end-exclusive byte ranges on that
-line, highlighted with SelectionToolsPreviewMatch. The original item.code guards
-against applying stale matches to changed buffer text. Caller-owned preview_item
-buffers are not decorated or modified by this feature.
+SelectionToolsCount. Explicit preview positions mark the target line with
+SelectionToolsPreviewLine. Grep supplies item.line_matches as zero-based,
+end-exclusive byte ranges on that line, highlighted with
+SelectionToolsPreviewMatch. The original item.code guards against applying
+stale matches to changed buffer text. Caller-owned preview_item buffers are
+not decorated or modified by this feature.
 
-selection.register_source(name, source)
-    Register or replace a source (including a built-in). Name must contain
-    only letters, digits, underscores or hyphens. Source is an options table
-    or a function(opts) returning an options table.
+selection.register_source(name, source) Register or replace a source
+(including a built-in). Name must contain only letters, digits, underscores or
+hyphens. Source is an options table or a function(opts) returning an options
+table.
 
-selection.pick(name, opts)
-    Resolve a source, merge per-call opts over its defaults, and open it.
-    Unknown sources raise an error. Returns a picker.
+selection.pick(name, opts) Resolve a source, merge per-call opts over its
+defaults, and open it. Unknown sources raise an error. Returns a picker.
 
-selection.files(opts)
-selection.buffers(opts)
-    Shortcuts for pick('files', opts) and pick('buffers', opts).
+selection.files(opts) selection.buffers(opts) Shortcuts for pick('files',
+opts) and pick('buffers', opts).
 
-selection.sources()
-    Return the sorted list of built-in and registered source names.
+selection.sources() Return the sorted list of built-in and registered source
+names.
 
-===============================================================================
-4. FINDER CONTRACT                                   *selection-tools-finder*
+==============================================================================
+4. FINDER CONTRACT                                    *selection-tools-finder*
 
 finder(ctx) is called once initially, or again on every query change if live
 is true. It should return quickly; use async I/O for expensive work. Optional
@@ -501,11 +565,12 @@ when the picker closes or the finder is superseded, even if done was called;
 it should be safe after completion.
 
 Live searches clear previous candidates before starting the new finder. Static
-searches continue filtering cached candidates while typing. Local fuzzy matching
-uses text only; Lua objects/functions are never passed through Vimscript.
+searches continue filtering cached candidates while typing. Local fuzzy
+matching uses text only; Lua objects/functions are never passed through
+Vimscript.
 
-===============================================================================
-5. PICKER METHODS                                   *selection-tools-methods*
+==============================================================================
+5. PICKER METHODS                                    *selection-tools-methods*
 
 picker:set_query(query)    Replace input and refresh filtering/search.
 picker:set_items(items)    Replace candidates and refresh filtering.
@@ -513,20 +578,24 @@ picker:move(delta)         Move selection, wrapping at either end.
 picker:move_visual(delta)  Move in screen directions, respecting reverse.
 picker:toggle()            Toggle a mark on the current item if multi=true.
 picker:selected(opts)      Marked values in source order. opts.fallback=true
-                          falls back to the current item if there are no marks.
+                          falls back to the current item if there are no
+                              marks.
 picker:history_move(delta) Browse previous (-1) or next (+1) query.
 picker:scroll_list(dir)    Half-window list movement, -1 up / +1 down.
 picker:scroll_preview(dir) Half-window preview scroll, -1 up / +1 down.
-picker:current()           Return item, original_index; nils with no selection.
+picker:current()           Return item, original_index; nils with no
+selection.
 picker:matcher_status()    { backend='none'|'native'|'skim', pending=boolean,
-                            error=string|nil }. Last fallback error is retained.
-picker:confirm()           Close and choose current item; no-op without matches.
+                            error=string|nil }. Last fallback error is
+                                retained.
+picker:confirm()           Close and choose current item; no-op without
+matches.
 picker:close()             Cancel. Repeated close calls are harmless.
 
 Methods that modify a closed picker are no-ops. Treat all other fields as
 internal implementation details.
 
-===============================================================================
+==============================================================================
 6. MATCHING BACKENDS                                 *selection-tools-matcher*
 >lua
     require('selection_tools').setup({
@@ -556,20 +625,22 @@ native, including preview, marks, clipboard actions and confirmation.
 Ranking differs between engines. Queries containing whitespace, ! ^ $ | quotes
 or backslashes, NUL, or more than 1024 characters use native matching even in
 skim mode. This avoids interpreting literal input as skim's extended search.
-Empty queries/lists and match=false bypass the matcher entirely (backend=none).
+Empty queries/lists and match=false bypass the matcher entirely
+(backend=none).
 
-While async matching is pending, the current list, selected position and preview
-remain visible, and confirmation is a no-op. No matching label is displayed.
-Existing marks are retained. Missing
-executables silently use native matching. A process failure, timeout or invalid
-result warns once and falls back to native for the rest of that picker. The
-matcher clears SKIM_DEFAULT_OPTIONS for its subprocess. matcher_status reports
-the current backend, pending flag and last fallback error.
+While async matching is pending, the current list, selected position and
+preview remain visible, and confirmation is a no-op. No matching label is
+displayed. Existing marks are retained. Missing executables silently use
+native matching. A process failure, timeout or invalid result warns once and
+falls back to native for the rest of that picker. The matcher clears
+SKIM_DEFAULT_OPTIONS for its subprocess. matcher_status reports the current
+backend, pending flag and last fallback error.
 
-Per-call matcher options override setup defaults. The threshold is configurable;
-it is a conservative default rather than a universal performance crossover.
+Per-call matcher options override setup defaults. The threshold is
+configurable; it is a conservative default rather than a universal performance
+crossover.
 
-===============================================================================
+==============================================================================
 7. BUILT-IN SOURCES                                  *selection-tools-sources*
 
 Every source has selection.<name>(opts) and selection.pick(name, opts). The
@@ -589,8 +660,10 @@ picker gets a fresh index.
   projects         Current, recent and explicit project roots; dev directories
                    scanned up to max_depth=2. projects={...}, dev={...},
                    markers={...}, recent=true. Confirm changes cwd and opens
-                   files; open_files=false only changes cwd. Directory preview.
-  recent           Listed buffers by last use, then v:oldfiles. Existing regular
+                   files; open_files=false only changes cwd. Directory
+                       preview.
+  recent           Listed buffers by last use, then v:oldfiles. Existing
+      regular
                    files only, canonical paths deduplicated. buffers=false
                    excludes buffers; explicit cwd restricts the directory.
   todo_comments    rg scan of KEYWORD: markers; includes NOTE by default.
@@ -617,16 +690,20 @@ picker gets a fresh index.
                    divider shows Step #parent -> #selected by default, so
                    each preview focuses on that undo block's own change.
                    F4 (undo_compare) toggles parent/current comparison without
-                   moving the selection or clearing the query. compare='current'
+                   moving the selection or clearing the query.
+                       compare='current'
                    starts with the snapshot captured on open as the baseline;
-                   compare='parent' is the default. Resume preserves this mode.
+                   compare='parent' is the default. Resume preserves this
+                       mode.
                    Initial states and pruned parents show full snapshots with
                    an explanatory title. Distinct nodes with identical text
                    can produce equal hunks in current comparison mode.
                    wrap=true/false overrides git-tools' diff.wrap default.
-                   Alt+Z (undo_wrap) toggles wrap in input/list (i/n), including
+                   Alt+Z (undo_wrap) toggles wrap in input/list (i/n),
+                       including
                    initial snapshots and no-change pages. Wrap survives node
-                   changes and F4 switches; side-by-side diffs wrap each column.
+                   changes and F4 switches; side-by-side diffs wrap each
+                       column.
                    Uses git-tools.nvim's native renderer by default. Repeated
                    file comparison headings are omitted. Hunk locations
                    remain visible. Custom delta.args override this default.
@@ -644,11 +721,14 @@ picker gets a fresh index.
   commands         Built-in, global and buffer-local commands. Buffer-local
                    definitions take precedence. Confirm fills :Command for
                    arguments; execute=true executes immediately.
-  autocmds         Event/group/pattern/description search and definition preview.
+  autocmds         Event/group/pattern/description search and definition
+      preview.
                    Confirm jumps to Lua source or opens read-only details.
   keymaps          Global and buffer-local mappings, all modes. Local mappings
-                   take precedence. modes={...}, global=false, ['local']=false,
-                   plugs=true adjust inclusion. Confirm locates the definition without executing keys.
+                   take precedence. modes={...}, global=false,
+                       ['local']=false,
+                   plugs=true adjust inclusion. Confirm locates the definition
+                       without executing keys.
                    Use keymap-tools.nvim for mode-aware execution.
   help             Runtime doc/tags search, positioned preview, native :help.
                    Deferred async reads and cancellable batched parsing. File
@@ -657,7 +737,8 @@ picker gets a fresh index.
   man              Index local man directories from manpath -q or man -w;
                    paths={...} overrides discovery. Async man rendering and
                    native :Man confirmation. Requires man on PATH.
-  spelling         Native suggestions for the word at/after the cursor. Confirm
+  spelling         Native suggestions for the word at/after the cursor.
+      Confirm
                    replaces only that word, refusing stale-buffer edits.
                    Compact forward layout with the input at the top.
   highlights       Highlight names, resolved properties and styled preview.
@@ -666,77 +747,119 @@ picker gets a fresh index.
                    and built-in symbols. Confirm inserts the glyph into the
                    original buffer, refusing stale-buffer edits.
                    curl downloads public catalogs asynchronously on first use;
-                   cache: stdpath('cache')/selection-tools/icons. Failures leave
-                   local symbols available. icon_sources={} disables downloads.
+                   cache: stdpath('cache')/selection-tools/icons. Failures
+                       leave
+                   local symbols available. icon_sources={} disables
+                       downloads.
                    icons={{icon='λ',name='lambda'}} supplies a list directly.
-                   custom_sources={label='/path/icons.json'} loads a local list
+                   custom_sources={label='/path/icons.json'} loads a local
+                       list
                    of {icon,name,category} objects or {glyph,name} pairs.
 
-selection.resume(opts) / :SelectionTools resume
-    Restore the last picker's source, query, current item, marks, list offset
-    and preview scroll. Static sources retain original Lua objects. Live,
-    unfinished and resume_refresh sources reload candidates with the saved
-    query. There is one in-memory snapshot; no cross-session persistence.
-    A custom source can set resume_refresh=true to rebuild origin-sensitive
-    callbacks, and item.key to identify candidates across refreshed ordering.
+selection.resume(opts) / :SelectionTools resume Restore the last picker's
+source, query, current item, marks, list offset and preview scroll. Static
+sources retain original Lua objects. Live, unfinished and resume_refresh
+sources reload candidates with the saved query. There is one in-memory
+snapshot; no cross-session persistence. A custom source can set
+resume_refresh=true to rebuild origin-sensitive callbacks, and item.key to
+identify candidates across refreshed ordering.
 
-File locations use item.file/item.bufnr and item.pos={1-based row, 0-based byte
-column}. item.search is an optional literal preview anchor (used by help tags).
-TODO and grep results expose file/pos and can use the standard file preview.
+File locations use item.file/item.bufnr and item.pos={1-based row, 0-based
+byte column}. item.search is an optional literal preview anchor (used by help
+tags). TODO and grep results expose file/pos and can use the standard file
+preview.
 
-
-TRANSACTION PICKERS                                  *selection-tools-transactions*
+TRANSACTION PICKERS                             *selection-tools-transactions*
 
 before_confirm(ctx) runs before closing a choice. Return true to accept,
-false,message to reject and keep the picker open, or nil to finish asynchronously.
-ctx provides picker, item, index, selected, is_cancelled(), accept(), reject(msg).
-accept() returns false for obsolete/closed confirmations. Moving away (even if
-returning), changing queries/items, or closing invalidates pending acceptance.
-Schedule fast callbacks onto the main thread before accepting or rejecting.
-on_close(picker,outcome) receives reason="confirm" or "cancel"; existing callbacks
-remain compatible. Cleanup and focus restoration precede on_close and on_choice.
-Use resume=false for callbacks tied to a particular transaction.
+false,message to reject and keep the picker open, or nil to finish
+asynchronously. ctx provides picker, item, index, selected, is_cancelled(),
+accept(), reject(msg). accept() returns false for obsolete/closed
+confirmations. Moving away (even if returning), changing queries/items, or
+closing invalidates pending acceptance. Schedule fast callbacks onto the main
+thread before accepting or rejecting. on_close(picker,outcome) receives
+reason="confirm" or "cancel"; existing callbacks remain compatible. Cleanup
+and focus restoration precede on_close and on_choice. Use resume=false for
+callbacks tied to a particular transaction.
 
-EXTERNAL DIFF PROVIDER                              *selection-tools-diff*
+EXTERNAL DIFF PROVIDER                                  *selection-tools-diff*
 
 Diff generation and native/delta rendering are provided by git-tools.nvim.
 Replace selection_tools.providers.diff.provider(opts) with
-require("git_tools.integrations.selection").diff(opts). Direct render callers use
-require("git_tools.diff").render(ctx,lines,opts,valid) with an explicit opts.cwd.
-Install git-tools on runtimepath for these optional calls. Ordinary selection
-and preview APIs do not depend on or load git-tools. Undo history optionally
-uses its unified diff generator; without git-tools it shows the full snapshot.
+require("git_tools.integrations.selection").diff(opts). Direct render callers
+use require("git_tools.diff").render(ctx,lines,opts,valid) with an explicit
+opts.cwd. Install git-tools on runtimepath for these optional calls. Ordinary
+selection and preview APIs do not depend on or load git-tools. Undo history
+optionally uses its unified diff generator; without git-tools it shows the
+full snapshot.
 
 ctx.set_buffer(buf,{owned=true,title="Preview"}) adopts a ready frame. The old
 owned frame is deleted only after replacement, or at picker close. Borrowed
-buffers are not deleted. Late owned frames are discarded and deleted. set_lines
-and paint switch back to the internal text buffer and release the owned frame.
-set_lines' fifth argument and paint/set_buffer metadata accept scrollable=false
-to suppress text scroll indicators (used by images), and truncated=true to mark
-an incomplete preview. preview_item results accept these fields as well.
-ctx.picker provides the owner. Preview providers otherwise keep the existing
-close/resize/retain protocol.
+buffers are not deleted. Late owned frames are discarded and deleted.
+set_lines and paint switch back to the internal text buffer and release the
+owned frame. set_lines' fifth argument and paint/set_buffer metadata accept
+scrollable=false to suppress text scroll indicators (used by images), and
+truncated=true to mark an incomplete preview. preview_item results accept
+these fields as well. ctx.picker provides the owner. Preview providers
+otherwise keep the existing close/resize/retain protocol.
 
-MATCH PRIORITY                                         *selection-tools-match-priority*
+MATCH PRIORITY                                *selection-tools-match-priority*
 
 match_priority(item, original_index) optionally returns a finite number. Lower
 priorities appear first; ties preserve matcher relevance order. Original item
 indices and match highlights remain aligned, for native and async matchers.
 
-NESTED PICKERS                                          *selection-tools-nested*
+NESTED PICKERS                                        *selection-tools-nested*
 
 Pass nested=true to open()/select() from a focused picker window. This creates
 an owned child and retains the parent's buffers, query, marks and preview.
-Child close restores the parent focus/mode/cursor; background finder deliveries
-wait for return. Children never replace resume history. A normal open replaces
-the entire chain. Parent closure and dispose close all descendants. Outside
-editor clicks dismiss the chain without restoring its focus.
+Child close restores the parent focus/mode/cursor; background finder
+deliveries wait for return. Children never replace resume history. A normal
+open replaces the entire chain. Parent closure and dispose close all
+descendants. Outside editor clicks dismiss the chain without restoring its
+focus.
 
 selection.current(win) returns the live picker owning that window (including a
 suspended parent); omitted win uses the current window. Returns nil otherwise.
 picker:owns_window(win) tests only that picker's own windows.
 
-action_descriptions={name="Description"} supplies descriptions for custom actions
-or overrides built-in labels. All configured action mappings expose desc.
+action_descriptions={name="Description"} supplies descriptions for custom
+actions or overrides built-in labels. All configured action mappings expose
+desc.
 
-vim:tw=78:ts=8:ft=help:norl:
+==============================================================================
+COMMAND OWNERSHIP                *selection-tools-reference-command-ownership*
+
+Commands belong to the plugin; choose global entry keys and short aliases in
+your configuration. Registration reports same-name conflicts without replacing
+user commands. Reconfiguration refreshes only commands still owned by this
+plugin, and cleanup preserves subsequent user replacements.
+
+==============================================================================
+SETUP CONTRACT                                     *selection-tools-lifecycle*
+                                    *selection-tools-reference-setup-contract*
+
+`setup(nil)` uses defaults. Configuration must be a table; caller-owned tables
+are copied before use. Invalid configuration types do not replace live
+handlers or commands. Repeating setup must not accumulate automatic
+registrations.
+
+`setup(opts)` validates layout and adapter options before changing the current
+configuration or `vim.ui.select`. `dispose()` closes the owned picker, cancels
+its asynchronous work, releases theme subscriptions and restores
+`vim.ui.select` only while still owned. It resets setup options, preserves
+registered custom sources, and is safe to repeat; call setup to install the
+adapter again.
+
+User-command metadata and highlight-definition tables use Lua syntax in
+previews. Expanded item details retain the item filetype and syntax, matching
+the preview.
+
+Test workflow (tests/README.md): registered suites, filtering, required
+fixtures and retained failure evidence.
+
+Exact occurrences stay visible when long rows are clipped, including on older
+Neovim fuzzy matchers. Borderless layouts omit the outer frame title;
+separator labels remain available. Resizing preserves preview window options.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
