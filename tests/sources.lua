@@ -431,6 +431,16 @@ test("commands include builtins and prefer buffer-local definitions", function()
   ready(p)
   eq(#p.matches, 1)
   assert(p:current().text:find("buffer", 1, true))
+  assert(vim.wait(500, function()
+    return vim.bo[p.preview_buf].filetype == "lua"
+  end, 2))
+  require("selection_tools.details").open(p)
+  eq(vim.bo[p.detail_buf].filetype, "lua")
+  assert(
+    vim.bo[p.detail_buf].syntax == "lua" or vim.treesitter.highlighter.active[p.detail_buf],
+    "details need Lua syntax or an active Lua parser"
+  )
+  require("selection_tools.details").close(p, true)
   p:confirm()
   eq(vim.g.selection_command_test, "buffer")
   p = tools.commands({ query = "edit" })

@@ -114,6 +114,16 @@ function Preview:_decorate(lines, pos)
   end
 end
 
+function Preview.highlight(buf, ft)
+  pcall(vim.treesitter.stop, buf)
+  vim.bo[buf].filetype = ft or ""
+  vim.bo[buf].syntax = ft or ""
+  if ft and ft ~= "" then
+    local lang = vim.treesitter.language.get_lang(ft) or ft
+    pcall(vim.treesitter.start, buf, lang)
+  end
+end
+
 function Preview:write(lines, ft, title, pos, metadata)
   if self.picker.closed or not api.nvim_buf_is_valid(self.buf) then
     return
@@ -133,16 +143,10 @@ function Preview:write(lines, ft, title, pos, metadata)
       end
     end
   end
-  pcall(vim.treesitter.stop, self.buf)
   vim.bo[self.buf].modifiable = true
   api.nvim_buf_set_lines(self.buf, 0, -1, false, #lines > 0 and lines or { "" })
   vim.bo[self.buf].modifiable = false
-  vim.bo[self.buf].filetype = ft or ""
-  vim.bo[self.buf].syntax = ft or ""
-  if ft and ft ~= "" then
-    local lang = vim.treesitter.language.get_lang(ft) or ft
-    pcall(vim.treesitter.start, self.buf, lang)
-  end
+  Preview.highlight(self.buf, ft)
   if self.picker.preview_win and api.nvim_win_is_valid(self.picker.preview_win) then
     local row = math.max(1, math.min(pos and pos[1] or 1, api.nvim_buf_line_count(self.buf)))
     local line = api.nvim_buf_get_lines(self.buf, row - 1, row, false)[1] or ""

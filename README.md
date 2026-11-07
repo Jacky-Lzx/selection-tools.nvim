@@ -662,3 +662,5 @@ configuration or `vim.ui.select`. `dispose()` closes the owned picker, cancels
 its asynchronous work, releases theme subscriptions and restores `vim.ui.select`
 only while still owned. It resets setup options, preserves registered custom
 sources, and is safe to repeat; call setup to install the adapter again.
+
+User-command metadata and highlight-definition tables use Lua syntax in previews. Expanded item details retain the item filetype and syntax, matching the preview.

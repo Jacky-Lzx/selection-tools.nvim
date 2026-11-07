@@ -45,6 +45,7 @@ return function(opts)
       local item = ctx.item
       if not item.detail then
         item.detail = vim.inspect(vim.tbl_extend("force", { scope = item.scope }, item.command))
+        item.ft = "lua"
       end
       util.preview(ctx)
     end,

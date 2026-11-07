@@ -32,7 +32,7 @@ return function()
         "\n",
         { plain = true }
       )
-      ctx.set_lines(lines, "text", name)
+      ctx.set_lines(lines, "lua", name)
       vim.schedule(function()
         if ctx.is_cancelled() or not vim.api.nvim_buf_is_valid(ctx.buf) then
           return

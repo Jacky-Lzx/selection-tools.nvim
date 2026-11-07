@@ -74,6 +74,7 @@ function M.open(picker)
     zindex = picker.resolved.frame.zindex + 15,
   })
   picker.detail_win = win
+  require("selection_tools.preview").highlight(buf, type(item) == "table" and item.ft or nil)
   vim.cmd.stopinsert()
   vim.wo[win].wrap, vim.wo[win].linebreak = true, true
   vim.wo[win].winhighlight = "Normal:NormalFloat,FloatBorder:SelectionToolsBorder"
