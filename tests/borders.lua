@@ -1,7 +1,8 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
 local api = vim.api
 local tools = require("selection_tools")
-local dir = "/private/tmp/st-border-" .. vim.fn.getpid()
+local dir = vim.fn.tempname()
+vim.o.columns = math.max(120, vim.fn.strdisplaywidth(dir) + 60)
 vim.fn.mkdir(dir .. "/子目录_é", "p")
 vim.fn.writefile({ "needle" }, dir .. "/a.lua")
 local function ready(p)

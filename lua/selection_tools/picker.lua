@@ -108,10 +108,12 @@ function Picker:_draw_frame()
     return
   end
   local title, alignment = require("selection_tools.border_labels").resolve(self, "top", self.opts.prompt or "Select")
-  api.nvim_win_set_config(self.frame_win, {
-    title = title and (" " .. single_line(title) .. " ") or "",
-    title_pos = alignment,
-  })
+  if self.opts.layout.border ~= "none" then
+    api.nvim_win_set_config(self.frame_win, {
+      title = title and (" " .. single_line(title) .. " ") or "",
+      title_pos = alignment,
+    })
+  end
   local lines = {}
   for i = 1, self.resolved.total_height do
     lines[i] = ""
@@ -461,6 +463,24 @@ function Picker:_match_ranges(entry, index)
   local cached = self.match_range_cache[entry]
   if cached and cached.query == self.query and cached.positions == positions then
     return cached.ranges
+  end
+  -- Older native fuzzy matchers may scatter a word across distant context even
+  -- when an exact occurrence exists. Keep clipping and painting on that word.
+  local query = self.query
+  local first_byte, last_byte
+  if query ~= "" and positions and #positions > 0 then
+    first_byte, last_byte = entry.text:find(query, 1, true)
+    if not first_byte and vim.fn.tolower(query) == query then
+      local folded = vim.fn.tolower(entry.text)
+      if #folded == #entry.text then
+        first_byte, last_byte = folded:find(query, 1, true)
+      end
+    end
+  end
+  if first_byte then
+    local ranges = { { first_byte - 1, last_byte } }
+    self.match_range_cache[entry] = { query = query, positions = positions, ranges = ranges }
+    return ranges
   end
   local ranges, first, last = {}, nil, nil
   local function append()
@@ -1322,7 +1342,11 @@ function Picker:resize()
   end
   for _, name in ipairs({ "frame", "input", "list", "preview" }) do
     if resolved[name] then
-      api.nvim_win_set_config(self[name .. "_win"], resolved[name])
+      -- Reapplying style=minimal resets window options on Neovim 0.10.
+      -- Initial creation already set the style; resizing preserves owner options.
+      local config = vim.tbl_extend("force", {}, resolved[name])
+      config.style = nil
+      api.nvim_win_set_config(self[name .. "_win"], config)
     end
   end
   self:_render()

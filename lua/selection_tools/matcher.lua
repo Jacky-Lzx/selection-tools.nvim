@@ -65,18 +65,41 @@ function Matcher:select(query)
   return "skim"
 end
 
+-- Neovim 0.10's native matcher ignores smart case. Validate uppercase-query
+-- membership independently and retain exact character positions for rendering.
+local native_smart_case = #vim.fn.matchfuzzypos({ "abc" }, "Ab", { matchseq = 1 })[1] == 0
+local function case_positions(text, query)
+  local positions, offset = {}, 1
+  for _, character in ipairs(vim.fn.split(query, "\\zs")) do
+    local first, last = text:find(character, offset, true)
+    if not first then
+      return
+    end
+    positions[#positions + 1] = vim.fn.strchars(text:sub(1, first - 1), true)
+    offset = last + 1
+  end
+  return positions
+end
+
 function Matcher:_native(query)
   local result = vim.fn.matchfuzzypos(self.texts, query, { matchseq = 1 })
-  local matches, occurrences = {}, {}
+  local matches, positions, occurrences = {}, {}, {}
+  local sensitive = not native_smart_case and vim.fn.tolower(query) ~= query
   for i, text in ipairs(result[1]) do
     local entry = self.lookup[text]
     if not entry.index then
       occurrences[text] = (occurrences[text] or 0) + 1
       entry = entry[occurrences[text]]
     end
-    matches[i] = entry
+    local exact = result[2][i]
+    if sensitive then
+      exact = case_positions(text, query)
+    end
+    if not sensitive or exact then
+      matches[#matches + 1], positions[#positions + 1] = entry, exact
+    end
   end
-  return matches, result[2]
+  return matches, positions
 end
 
 function Matcher:run(query, backend, done)

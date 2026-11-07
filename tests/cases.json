@@ -883,18 +883,21 @@
   "fixtures": {
     "git-tools.nvim": {
       "repository": "Jacky-Lzx/git-tools.nvim",
-      "revision": "29a9db7c77f25800d7c4d21483ea8da0e5b064eb",
+      "revision": "59b948876e7df430b9b405ec72aa0a7bfbe5f06a",
       "path": "{root}/../git-tools.nvim"
     },
     "image-tools.nvim": {
       "repository": "Jacky-Lzx/image-tools.nvim",
-      "revision": "8389b34a1e1c715256bb6b97755fdb3887f96bbd",
+      "revision": "1d4d62083c896007651d1b41e9a756deb31327b1",
       "path": "{root}/../image-tools.nvim"
     },
     "theme-tools.nvim": {
       "repository": "Jacky-Lzx/theme-tools.nvim",
-      "revision": "6eb5fc94618dd0f8e03d97515f8852274a3e6167",
+      "revision": "ea575718d7207d06e278d5ad2ed926b2bf38573d",
       "path": "{root}/../theme-tools.nvim"
     }
-  }
+  },
+  "requires": [
+    "exe:rg"
+  ]
 }

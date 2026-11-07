@@ -24,6 +24,8 @@ jobs:
           token: ${{ github.token }}
           version: v2.6.0
           args: --check lua plugin tests
+      - name: Install test tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Install pinned sibling fixtures
         run: python3 tests/run.py fixtures
       - name: Registered runtime and UI tests

@@ -900,6 +900,17 @@ end
 
 local fake_matcher = { backend = "skim", skim = { command = "selection-test-sk", debounce_ms = 0 } }
 
+test("native uppercase queries preserve smart-case membership on every supported version", function()
+  local p = tools.open({ items = { "Abc", "abc", "AXby", "axby" }, matcher = { backend = "native" } })
+  p:set_query("Ab")
+  local actual = vim.tbl_map(function(entry)
+    return entry.text
+  end, p.matches)
+  table.sort(actual)
+  eq(actual, { "AXby", "Abc" })
+  p:close()
+end)
+
 test("async skim cancels stale queries, retains visible choices and preserves identity", function()
   fake_skim(function(jobs)
     local old, new = { text = "old" }, { text = "new", run = function() end }
@@ -1104,7 +1115,8 @@ if vim.fn.executable("sk") == 1 then
       local actual = vim.tbl_map(function(entry)
         return entry.text
       end, p.matches)
-      local expected = vim.fn.matchfuzzypos(texts, query, { matchseq = 1 })[1]
+      -- Neovim 0.10's matcher is not a smart-case oracle for uppercase queries.
+      local expected = query == "Ab" and { "Abc" } or vim.fn.matchfuzzypos(texts, query, { matchseq = 1 })[1]
       table.sort(actual)
       table.sort(expected)
       eq(actual, expected)

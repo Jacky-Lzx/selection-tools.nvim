@@ -37,6 +37,9 @@ function M.resolve(opts)
     width = width,
     total_height = height,
   }
+  if layout.border == "none" then
+    result.frame.title, result.frame.title_pos = nil, nil
+  end
   if layout.input_position == "bottom" then
     result.input = vim.tbl_extend("force", common, { row = row + height, height = 1 })
     result.list = vim.tbl_extend(

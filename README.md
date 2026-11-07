@@ -644,3 +644,7 @@ sources, and is safe to repeat; call setup to install the adapter again.
 User-command metadata and highlight-definition tables use Lua syntax in previews. Expanded item details retain the item filetype and syntax, matching the preview.
 
 [Test workflow](tests/README.md): registered suites, filtering, required fixtures and retained failure evidence.
+
+Exact occurrences stay visible when long rows are clipped, including on older
+Neovim fuzzy matchers. Borderless layouts omit the outer frame title; separator
+labels remain available. Resizing preserves preview window options.
