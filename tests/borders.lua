@@ -70,7 +70,7 @@ ready(p)
 check(p, false)
 p:close()
 p = tools.open({ cwd = dir, items = { "one" }, preview = { enabled = true }, layout = { height = 0.9, width = 0.95 } })
-assert(table.concat(lines(p)):find(dir, 1, true))
+assert(table.concat(lines(p)):find(vim.fn.fnamemodify(dir, ":~"), 1, true))
 p:close()
 vim.fn.delete(dir, "rf")
 print(

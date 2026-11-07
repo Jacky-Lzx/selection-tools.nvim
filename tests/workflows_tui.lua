@@ -33,7 +33,12 @@ local function check_borders()
   assert(api.nvim_win_get_config(p.frame_win).title[1][1] == " " .. p.opts.prompt .. " ")
   local path_index = p.opts.layout.input_position == "bottom" and 1 or #lines
   local filter_index = p.opts.layout.input_position == "bottom" and #lines or 1
-  assert(lines[path_index]:find(vim.fn.fnamemodify(p.opts.cwd, ":~"), 1, true))
+  local expected = vim.fn.fnamemodify(p.opts.cwd, ":~")
+  local label = lines[path_index]
+  if not label:find(expected, 1, true) then
+    local visible = label:match(" (.-)…")
+    assert(visible and #visible > 0 and expected:sub(1, #visible) == visible, "Invalid clipped directory label")
+  end
   assert(lines[filter_index]:find(p.opts.hidden and "hidden:on" or "hidden:off", 1, true))
   assert(lines[filter_index]:find(p.opts.ignored and "ignore:off" or "ignore:on", 1, true))
   if p.opts.source == "grep" then

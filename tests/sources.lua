@@ -164,8 +164,14 @@ test("projects combine explicit, recent and discovered roots without duplicates"
   vim.fn.writefile({ "one" }, fixture .. "/work/one/file.txt")
   vim.v.oldfiles = { fixture .. "/work/one/file.txt" }
   local ok, err = pcall(function()
-    local p =
-      tools.projects({ projects = { fixture .. "/work/one" }, dev = { fixture .. "/work" }, open_files = false })
+    local p = tools.projects({
+      projects = { fixture .. "/work/one" },
+      dev = { fixture .. "/work" },
+      open_files = false,
+      format_item = function(item)
+        return vim.fs.basename(item.dir)
+      end,
+    })
     ready(p)
     local count = 0
     for _, entry in ipairs(p.entries) do
@@ -174,7 +180,7 @@ test("projects combine explicit, recent and discovered roots without duplicates"
       end
     end
     eq(count, 1)
-    p:set_query("work/two")
+    p:set_query("two")
     eq(#p.matches, 1)
     p:confirm()
     eq(vim.fn.getcwd(), vim.uv.fs_realpath(fixture .. "/work/two"))
